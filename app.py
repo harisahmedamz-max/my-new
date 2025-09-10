@@ -1354,10 +1354,11 @@ if mode == "Lib-Ate":
         # --- Render chat so far ---
         for role, text in st.session_state.get("CHAT_LOG", []):
             if role == "assistant":
-                with st.chat_message("assistant", avatar=" "):  # blank avatar
-                    st.markdown(text)
+               with st.chat_message("assistant"):
+                   st.markdown(text)
+
             else:
-                with st.chat_message("user", avatar=" "):       # blank avatar
+                with st.chat_message("user"):       # blank avatar
                     st.markdown(text)
     
         # ✅ If all prompts done, stay here once to show full chat
@@ -3430,6 +3431,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
