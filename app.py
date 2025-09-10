@@ -7,6 +7,7 @@
 # - PlaidMagGen (visual prompt builder; outputs rich image prompt spec)
 # - PlaidPlay (multiplayer simulation: prompt → faux submissions → voting)
 # - PlaidChat (continuous chat interface with Quip personas)
+#
 # No external APIs required. Runs offline. All state kept in st.session_state.
 import requests
 from io import BytesIO
@@ -1307,43 +1308,24 @@ if mode == "Lib-Ate":
     # --- STEP 4: Word collection ---
     elif step == 4:
         prompts = [
-            ("name", "Character Name", "Your main character’s name"),
-            ("profession", "Role/Profession", "What they do or how they’re seen"),
-            ("place", "Place/Setting", "Any location: city, forest, ship, café…"),
-            ("adjective", "Descriptive Word", "Moody, bright, stubborn, calm…"),
-            ("object", "Important Object", "Lantern, book, ring, key…"),
-            ("name2", "Second Character", "Friend, rival, or ally"),
-            ("object2", "Second Object", "Coin, map, letter, compass…"),
-            ("place2", "Second Location", "Market, mountain, alley, lake…"),
-            ("portal", "Threshold/Change Point", "Doorway, path, ripple, curtain…"),
-            ("trait", "Personal Trait", "Courage, kindness, wit, envy…"),
-            ("emotion", "Emotion/Feeling", "Joy, fear, longing, wonder…"),
-            ("weather", "Weather/Environment", "Storm, sunlight, snow, fog…"),
-            ("color", "Color", "Crimson, gold, silver, black…"),
-            ("animal", "Animal/Creature", "Crow, cat, horse, dragonfly…"),
-            ("sound", "Sound", "Whisper, laughter, thunder, hum…"),
-            ("symbol", "Symbol/Sign", "Crown, spiral, feather, flame…"),
-            ("food", "Food/Drink", "Bread, tea, stew, fruit…"),
-            ("clothing", "Clothing/Accessory", "Cloak, boots, scarf, hat…"),
-            ("time", "Time Reference", "Dawn, midnight, yesterday…"),
-            ("wild", "Wildcard", "Anything you want"),
+            ("name", "Name (proper noun)", "Think protagonist: e.g., ‘Rowan’"),
+            ("profession", "Profession (noun)", "Detective, baker, cartographer…"),
+            ("place", "Place (noun)", "City, valley, ship, café…"),
+            ("adjective", "Adjective", "Moody, iridescent, stubborn…"),
+            ("object", "Object (noun)", "Lantern, violin, ledger…"),
+            ("name2", "Second character name", "Rival or ally"),
+            ("object2", "Second object (noun)", "Key, coin, compass…"),
+            ("place2", "Second place (noun)", "Square, market, jetty…"),
+            ("portal", "Portal/threshold (noun)", "Doorway, ripple, curtain…"),
+            ("tool", "Tool/aid (abstract ok)", "Courage, compass, trick…"),
+            ("trait", "Virtue/trait", "Grace, grit, candor…"),
+            ("wild", "Wildcard word/phrase", "Anything at all"),
         ]
     
-        fixed_prompts = [
-            ("name", "Character Name", "Your main character’s name"),
-            ("place", "Place/Setting", "Any location: city, forest, ship, café…"),
-            ("object", "Important Object", "Lantern, book, ring, key…"),
-        ]
-    
-        remaining_prompts = [p for p in prompts if p not in fixed_prompts]
-    
-        # initialize session if missing
+        # initialize state if missing
         if "PROMPTS_SESSION" not in L:
-            random_prompts = random.sample(remaining_prompts, 5)
-            selected_prompts = fixed_prompts + random_prompts
-            random.shuffle(selected_prompts)
-            L["PROMPTS_SESSION"] = selected_prompts
-            L["PROMPTS_NEEDED"] = len(selected_prompts)
+            L["PROMPTS_SESSION"] = random.sample(prompts, 8)  # 🎲 pick 8 unique prompts
+            L["PROMPTS_NEEDED"] = len(L["PROMPTS_SESSION"])
             L["PROMPTS_COLLECTED"] = 0
             L["COLLECTED"] = {}
             L["VARS"] = {}
@@ -1351,32 +1333,19 @@ if mode == "Lib-Ate":
         idx = L.get("PROMPTS_COLLECTED", 0)
         session_prompts = L["PROMPTS_SESSION"]
     
-        # --- Render chat so far ---
-        for role, text in st.session_state.get("CHAT_LOG", []):
-            if role == "assistant":
-               with st.chat_message("assistant"):
-                   st.markdown(text)
-
-            else:
-                with st.chat_message("user"):       # blank avatar
-                    st.markdown(text)
-    
-        # ✅ If all prompts done, stay here once to show full chat
+        # ✅ If all prompts collected → move on
         if idx >= L["PROMPTS_NEEDED"]:
-            # Show a final assistant confirmation message
-            if L.get("finished_prompts") is not True:
-                st.session_state["CHAT_LOG"].append(
-                    ("assistant", "✅ All prompts collected! Let's move on to the story...")
-                )
-                L["finished_prompts"] = True
-            else:
-                # On next rerun, proceed to step 5
-                st.session_state.GLOBAL["CURRENT_STEP"] = 5
-                st.rerun()
+            st.session_state.GLOBAL["CURRENT_STEP"] = 5
+            st.rerun()
     
-        # Ask next prompt
         key_name, title, helptext = session_prompts[idx]
     
+        # --- Render chat so far ---
+        for role, text in st.session_state.get("CHAT_LOG", []):
+            with st.chat_message(role):
+                st.markdown(text)
+    
+        # --- If new prompt, append assistant message ---
         if L.get("last_prompt_idx") != idx:
             msg = (
                 f"Prompt {idx+1} of {L['PROMPTS_NEEDED']}:\n\n"
@@ -1387,7 +1356,7 @@ if mode == "Lib-Ate":
             L["last_prompt_idx"] = idx
             st.rerun()
     
-        # User input
+        # --- User input for current prompt ---
         v = st.chat_input("Your answer (or type 'surprise me'):")
         if v:
             ans = v.strip()
@@ -1410,15 +1379,15 @@ if mode == "Lib-Ate":
                 ])
                 L["COLLECTED"][key_name] = auto
                 L["VARS"][key_name] = auto
-                st.session_state["CHAT_LOG"].append(("assistant", f'Surprise pick: "{auto}"'))
+                st.session_state["CHAT_LOG"].append(("assistant", f'🎲 Surprise pick: "{auto}"'))
             else:
                 L["COLLECTED"][key_name] = ans
                 L["VARS"][key_name] = ans
     
+            # ✅ advance to next prompt
             L["PROMPTS_COLLECTED"] = idx + 1
             st.session_state.GLOBAL["CURRENT_STEP"] = 4
             st.rerun()
-
 
 
 
@@ -3431,79 +3400,4 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
