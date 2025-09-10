@@ -1330,23 +1330,21 @@ if mode == "Lib-Ate":
             ("wild", "Wildcard", "Anything you want"),
         ]
     
-        # ✅ fixed prompts that must always appear
         fixed_prompts = [
             ("name", "Character Name", "Your main character’s name"),
             ("place", "Place/Setting", "Any location: city, forest, ship, café…"),
             ("object", "Important Object", "Lantern, book, ring, key…"),
         ]
     
-        # Remaining pool (everything except fixed)
         remaining_prompts = [p for p in prompts if p not in fixed_prompts]
     
-        # initialize state if missing
+        # initialize session if missing
         if "PROMPTS_SESSION" not in L:
-            random_prompts = random.sample(remaining_prompts, 5)   # 🎲 pick 5
+            random_prompts = random.sample(remaining_prompts, 5)
             selected_prompts = fixed_prompts + random_prompts
-            random.shuffle(selected_prompts)  # mix order
+            random.shuffle(selected_prompts)
             L["PROMPTS_SESSION"] = selected_prompts
-            L["PROMPTS_NEEDED"] = len(L["PROMPTS_SESSION"])
+            L["PROMPTS_NEEDED"] = len(selected_prompts)
             L["PROMPTS_COLLECTED"] = 0
             L["COLLECTED"] = {}
             L["VARS"] = {}
@@ -1354,19 +1352,23 @@ if mode == "Lib-Ate":
         idx = L.get("PROMPTS_COLLECTED", 0)
         session_prompts = L["PROMPTS_SESSION"]
     
-        # ✅ If all prompts collected → move on
-        if idx >= L["PROMPTS_NEEDED"]:
-            st.session_state.GLOBAL["CURRENT_STEP"] = 5
-            st.rerun()
-    
-        key_name, title, helptext = session_prompts[idx]
-    
         # --- Render chat so far ---
         for role, text in st.session_state.get("CHAT_LOG", []):
-            with st.chat_message(role):
+            # role label removed → no emojis
+            with st.chat_message("", avatar=""):
                 st.markdown(text)
     
-        # --- If new prompt, append assistant message ---
+        # ✅ If all prompts done, stay here once to show full chat
+        if idx >= L["PROMPTS_NEEDED"]:
+            st.markdown("✅ All prompts collected! Continue to the next step.")
+            if st.button("Next →"):
+                st.session_state.GLOBAL["CURRENT_STEP"] = 5
+                st.rerun()
+            st.stop()
+    
+        # Ask next prompt
+        key_name, title, helptext = session_prompts[idx]
+    
         if L.get("last_prompt_idx") != idx:
             msg = (
                 f"Prompt {idx+1} of {L['PROMPTS_NEEDED']}:\n\n"
@@ -1377,7 +1379,7 @@ if mode == "Lib-Ate":
             L["last_prompt_idx"] = idx
             st.rerun()
     
-        # --- User input for current prompt ---
+        # User input
         v = st.chat_input("Your answer (or type 'surprise me'):")
         if v:
             ans = v.strip()
@@ -1400,12 +1402,11 @@ if mode == "Lib-Ate":
                 ])
                 L["COLLECTED"][key_name] = auto
                 L["VARS"][key_name] = auto
-                st.session_state["CHAT_LOG"].append(("assistant", f'🎲 Surprise pick: "{auto}"'))
+                st.session_state["CHAT_LOG"].append(("assistant", f'Surprise pick: "{auto}"'))
             else:
                 L["COLLECTED"][key_name] = ans
                 L["VARS"][key_name] = ans
     
-            # ✅ advance to next prompt
             L["PROMPTS_COLLECTED"] = idx + 1
             st.session_state.GLOBAL["CURRENT_STEP"] = 4
             st.rerun()
@@ -3422,6 +3423,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
