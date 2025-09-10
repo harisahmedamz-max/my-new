@@ -750,32 +750,17 @@ def tally_votes(submissions: List[Dict[str, Any]]) -> Dict[str, int]:
         if len(ranked) >= 2: tally[ranked[1]] += 1
     return tally
 
-def plaidmag_gen(story_text: str, format_name: str = "3-Panel Comic Scene"):
-    """
-    Generate a PlaidMagGen image from the story with a chosen visual format.
-    
-    Args:
-        story_text (str): The story text to base the image on.
-        format_name (str): Visual format style (e.g., "Character Portrait", "Plaid Card").
-    
-    Returns:
-        PIL.Image or None
-    """
-    # Trim story to avoid overly long prompts
-    safe_prompt = story_text[:900]
+import streamlit as st
+from PIL import Image, ImageDraw
+from io import BytesIO
 
-    # Build the base image prompt depending on format
-    format_prompts = {
-        "3-Panel Comic Scene": f"Comic-style 3 panel illustration (setup, chaos, reveal) inspired by this story: {safe_prompt}",
-        "Character Portrait": f"Detailed character portrait illustration inspired by this story: {safe_prompt}",
-        "Plaid Card": f"Collectible trading card style illustration with plaid accents, inspired by this story: {safe_prompt}",
-        "Scene Illustration": f"Single dramatic moment illustration inspired by this story: {safe_prompt}",
-    }
-    
-    base_prompt = format_prompts.get(
-        format_name,
-        f"Comic-style illustration with bright white background, inspired by this story: {safe_prompt}"
-    )
+def plaidmag_gen(story_text: str):
+    """
+    Generate a PlaidMagGen image from the story.
+    Returns a PIL.Image object.
+    """
+    safe_prompt = story_text[:900]
+    base_prompt = f"Comic-style 3 panel illustration inspired by this story: {safe_prompt}"
 
     try:
         result = client.images.generate(
@@ -794,7 +779,6 @@ def plaidmag_gen(story_text: str, format_name: str = "3-Panel Comic Scene"):
     except Exception as e:
         st.error(f"❌ Image generation failed: {e}")
         return None
-
 
 
 
@@ -1340,27 +1324,23 @@ if mode == "Lib-Ate":
     
         key_name, title, helptext = session_prompts[idx]
     
-        # --- Render chat so far ---
-        for role, text in st.session_state.get("CHAT_LOG", []):
-            with st.chat_message(role):
-                st.markdown(text)
-    
-        # --- If new prompt, append assistant message ---
+        # ✅ Only add assistant message once per new idx
         if L.get("last_prompt_idx") != idx:
             msg = (
                 f"Prompt {idx+1} of {L['PROMPTS_NEEDED']}:\n\n"
                 f"**{title}**\n{helptext}\n\n"
-                "_Type an answer or say 'surprise me'._"
+                f"{macquip_aside('If you draw a blank, type “surprise me”.', 'Lib-Ate')}\n\n"
+                "Your answer (or type \"surprise me\"):"
             )
-            st.session_state.setdefault("CHAT_LOG", []).append(("assistant", msg))
+            add_message(active_quip, quip_speak(active_quip, "prompt", msg))
             L["last_prompt_idx"] = idx
             st.rerun()
     
-        # --- User input for current prompt ---
-        v = st.chat_input("Your answer (or type 'surprise me'):")
-        if v:
+        # One input per prompt index
+        v = st.text_input("Answer", key=f"libate_word_input_{idx}")
+        if st.button("Submit answer", key=f"libate_submit_{idx}"):
             ans = v.strip()
-            st.session_state["CHAT_LOG"].append(("user", ans if ans else "surprise me"))
+            add_message("user", ans if ans else "surprise me")
     
             if not ans or ans.lower() == "surprise me":
                 auto = random.choice([
@@ -1379,7 +1359,7 @@ if mode == "Lib-Ate":
                 ])
                 L["COLLECTED"][key_name] = auto
                 L["VARS"][key_name] = auto
-                st.session_state["CHAT_LOG"].append(("assistant", f'🎲 Surprise pick: "{auto}"'))
+                add_message(active_quip, f'🎲 Surprise pick: "{auto}"')
             else:
                 L["COLLECTED"][key_name] = ans
                 L["VARS"][key_name] = ans
@@ -1388,8 +1368,6 @@ if mode == "Lib-Ate":
             L["PROMPTS_COLLECTED"] = idx + 1
             st.session_state.GLOBAL["CURRENT_STEP"] = 4
             st.rerun()
-
-
 
     # --- STEP 5: Confirmation ---
     elif step == 5:
@@ -1488,136 +1466,78 @@ if mode == "Lib-Ate":
             st.error("⚠️ No story was generated. Please restart.")
             st.stop()
     
-        # --- If we are in PlaidMagGen mode ---
-        if st.session_state.get("plaidmag_mode", False):
-            st.markdown("### 🎨 PlaidMagGen Visuals")
+        # Remix / restart menu
+        st.code(
+            "🔄 What would you like to do next?\n\n"
+            "1. Fluff It Up - Add softness, poetic language, whimsy\n"
+            "2. Dial It Up - Switch to humorous dialect\n"
+            "3. Style It Up - Retell in a different literary style\n"
+            "4. Plaidgerize - Rewrite with maximum absurdity\n"
+            "5. PlaidMagGen-It - Generate matching PlaidLibs visual\n"
+            "6. New Story - Start over\n",
+            language="text",
+        )
     
-            # Step 1: Ask format if not chosen yet
-            if "plaidmag_format" not in st.session_state:
-                format_menu = (
-                    "Choose your visual format:\n"
-                    "1. 3-Panel Comic Scene - Setup, chaos, reveal sequence\n"
-                    "2. Character Portrait - Detailed character illustration\n"
-                    "3. Plaid Card - Collectible trading card style\n"
-                    "4. Scene Illustration - Single dramatic moment\n"
-                    "5. Wild Card - Surprise format!"
+        choice = st.text_input("Pick 1–6", key="libate_remix")
+        if st.button("Apply Remix"):
+            seeds = L.get("COLLECTED", {}).copy()
+            style = L.get("STYLE_SELECTED", "Flash Fiction")
+            genre = L.get("GENRE_SELECTED", "Adventure")
+            absurd = L.get("ABSURDITY_SELECTED", "Mild")
+    
+            if choice.strip() == "1":
+                style = "Magic Realism"
+            elif choice.strip() == "2":
+                seeds["trait"] = seeds.get("trait", "grit") + " (dialect spice)"
+            elif choice.strip() == "3":
+                style = random.choice(
+                    ["Ballads", "Breaking News", "Scriptlets", "Flash Fiction"]
                 )
-                st.info(format_menu)
+            elif choice.strip() == "4":
+                absurd = "Plaidemonium™"
     
-                fmt_choice = st.text_input(
-                    "Your choice (1–5 or format name)",
-                    key="plaidmag_format_input"
+            if choice.strip() in {"1", "2", "3", "4"}:
+                new_story = generate_story(
+                    style, genre, absurd, L.get("QUIP_SELECTED", "MacQuip"), seeds
                 )
+                st.session_state.generated_story = new_story
+                st.markdown("### ✨ Remixed Story")
+                st.markdown(new_story)
     
-                if st.button("Confirm Format"):
-                    mapping = {
-                        "1": "3-Panel Comic Scene",
-                        "2": "Character Portrait",
-                        "3": "Plaid Card",
-                        "4": "Scene Illustration",
-                        "5": "Wild Card",
-                    }
-                    sel = fmt_choice.strip()
-                    if sel in mapping:
-                        selected_format = mapping[sel]
-                    else:
-                        selected_format = next(
-                            (v for v in mapping.values() if sel.lower() in v.lower()), None
-                        )
-    
-                    if not selected_format:
-                        st.error("❌ Invalid choice. Enter 1–5 or a format name.")
-                    else:
-                        if selected_format == "Wild Card":
-                            selected_format = random.choice(
-                                ["3-Panel Comic Scene", "Character Portrait", "Plaid Card", "Scene Illustration"]
+            elif choice.strip() == "5":
+                with st.spinner("🎨 Generating PlaidMagGen visuals..."):# PlaidMagGen-It
+                    try:
+                        img = plaidmag_gen(story_text)  # returns one composite PNG
+                        if img:
+                            st.session_state.generated_image = img
+                            st.image(
+                                img,
+                                caption="🎨 PlaidMagGen Comic",
+                                use_container_width=True
                             )
-                            st.success(f"🎲 Wild Card → {selected_format}")
-    
-                        st.session_state.plaidmag_format = selected_format
-                        st.rerun()
-    
-            # Step 2: Generate once format is chosen
-            else:
-                selected_format = st.session_state.plaidmag_format
-                st.success(f"✅ Format selected: {selected_format}")
-    
-                if st.button("Generate Image", key="plaidmag_generate"):
-                    with st.spinner(f"🎨 Generating {selected_format}..."):
-                        try:
-                            img = plaidmag_gen(story_text, format_name=selected_format)
-                            if img:
-                                st.session_state.generated_image = img
-                                st.image(
-                                    img,
-                                    caption=f"🎨 PlaidMagGen - {selected_format}",
-                                    use_container_width=True
-                                )
-                                # Download option
-                                buf = BytesIO()
-                                img.save(buf, format="PNG")
-                                st.download_button(
-                                    label="📥 Download Image",
-                                    data=buf.getvalue(),
-                                    file_name=f"plaidmaggen_{selected_format.replace(' ', '_').lower()}.png",
-                                    mime="image/png",
-                                )
-                            else:
-                                st.error("⚠️ Image generation failed — no image returned.")
-                        except Exception as e:
-                            st.error(f"❌ PlaidMagGen failed: {e}")
-    
-                if st.button("⬅️ Back to Post-Story Menu"):
-                    st.session_state.pop("plaidmag_mode", None)
-                    st.session_state.pop("plaidmag_format", None)
-                    st.rerun()
-    
-        # --- Normal Post-story menu ---
-        else:
-            st.code(
-                "🔄 What would you like to do next?\n\n"
-                "1. Fluff It Up - Add softness, poetic language, whimsy\n"
-                "2. Dial It Up - Switch to humorous dialect\n"
-                "3. Style It Up - Retell in a different literary style\n"
-                "4. Plaidgerize - Rewrite with maximum absurdity\n"
-                "5. PlaidMagGen-It - Generate matching PlaidLibs visual\n"
-                "6. New Story - Start over\n",
-                language="text",
-            )
-    
-            choice = st.text_input("Pick 1–6", key="libate_remix")
-            if st.button("Apply Remix"):
-                seeds = L.get("COLLECTED", {}).copy()
-                style = L.get("STYLE_SELECTED", "Flash Fiction")
-                genre = L.get("GENRE_SELECTED", "Adventure")
-                absurd = L.get("ABSURDITY_SELECTED", "Mild")
-    
-                if choice.strip() == "1":
-                    style = "Magic Realism"
-                elif choice.strip() == "2":
-                    seeds["trait"] = seeds.get("trait", "grit") + " (dialect spice)"
-                elif choice.strip() == "3":
-                    style = random.choice(
-                        ["Ballads", "Breaking News", "Scriptlets", "Flash Fiction"]
-                    )
-                elif choice.strip() == "4":
-                    absurd = "Plaidemonium™"
-                elif choice.strip() == "5":
-                    # ✅ Enter PlaidMagGen mode
-                    st.session_state.plaidmag_mode = True
-                    st.rerun()
-                elif choice.strip() == "6":
-                    reset_mode("Lib-Ate")
-                    st.rerun()
-    
-                if choice.strip() in {"1", "2", "3", "4"}:
-                    new_story = generate_story(
-                        style, genre, absurd, L.get("QUIP_SELECTED", "MacQuip"), seeds
-                    )
-                    st.session_state.generated_story = new_story
-                    st.markdown("### ✨ Remixed Story")
-                    st.markdown(new_story)
+                
+                            # Optional: Download button
+                            buf = BytesIO()
+                            img.save(buf, format="PNG")
+                            st.download_button(
+                                label="📥 Download Comic as PNG",
+                                data=buf.getvalue(),
+                                file_name="plaidmaggen_comic.png",
+                                mime="image/png",
+                            )
+                        else:
+                            st.error("⚠️ Image generation failed — no image returned.")
+                    except Exception as e:
+                        st.error(f"❌ PlaidMagGen failed: {e}")
 
+
+    
+         
+            elif choice.strip() == "6":
+                reset_mode("Lib-Ate")
+                st.rerun()
+            else:
+                st.error("Pick 1–6.")
 
  
         # Post-story download options
@@ -1676,27 +1596,28 @@ elif mode == "Create Direct":
             add_message("assistant",
                 f"✍️ Welcome to Create Direct™!\n\nChoose the literary style:\n{menu}\n"
                 "6. Wild Card - Surprise style!\n7. Reshuffle - Different options\n\n"
-                "👉 You can type either the number or part of the style name."
+                "👉 You can type either the number or the style name."
             )
             st.rerun()
     
-        v = st.text_input("Your choice (1-7 or partial style name)", key="cd_style_pick")
+        v = st.text_input("Your choice (1-7 or style name)", key="cd_style_pick")
         if st.button("Submit style"):
             add_message("user", v)
-            c = v.strip().lower()
+            c = v.strip()
     
             # Handle reshuffle
             if c == "7":
                 C["STYLE_OPTIONS"] = pick_random_styles()
                 styles = C["STYLE_OPTIONS"]
                 new_menu = "\n".join([f"{i+1}. {n} - {d}" for i,(n,d) in enumerate(styles)])
-    
+            
                 reshuf_prompt = (
                     f"🔄 Styles reshuffled! Choose again:\n{new_menu}\n"
                     "6. Wild Card - Surprise style!\n7. Reshuffle - Different options\n\n"
-                    "👉 You can type either the number or part of the style name."
+                    "👉 Or, type your own custom style."
                 )
                 add_message("assistant", reshuf_prompt)
+            
                 st.session_state.GLOBAL["CURRENT_STEP"] = 1
                 st.rerun()
     
@@ -1714,21 +1635,12 @@ elif mode == "Create Direct":
                 st.session_state.GLOBAL["CURRENT_STEP"] = 2
                 st.rerun()
     
+            # Handle custom style (anything else)
             else:
-                # Try partial match
-                match = next(
-                    (s[0] for s in styles if c in s[0].lower()), None
-                )
-                if match:
-                    C["STYLE_SELECTED"] = match
-                    add_message("assistant", f"✅ Selected Style: {C['STYLE_SELECTED']}")
-                    st.session_state.GLOBAL["CURRENT_STEP"] = 2
-                    st.rerun()
-                else:
-                    add_message("assistant", "❌ Invalid choice. Please enter 1–7 or part of a style name.")
-                    st.session_state.GLOBAL["CURRENT_STEP"] = 1
-                    st.rerun()
-
+                C["STYLE_SELECTED"] = c
+                add_message("assistant", f"✨ Custom Style Selected: {C['STYLE_SELECTED']}")
+                st.session_state.GLOBAL["CURRENT_STEP"] = 2
+                st.rerun()
 
 
 
@@ -1744,9 +1656,13 @@ elif mode == "Create Direct":
             flex_names = [g for g in FLEX_GENRES]
             plaid_names = [g for g in PLAIDVERSE]
     
-            core_chosen = random.sample(core_names, min(3, len(core_names))) if core_names else []
-            flex_chosen = random.sample(flex_names, min(2, len(flex_names))) if flex_names else []
-            plaid_chosen = random.sample(plaid_names, min(1, len(plaid_names))) if plaid_names else []
+            core_count = min(3, len(core_names))
+            flex_count = min(2, len(flex_names))
+            plaid_count = min(1, len(plaid_names))
+    
+            core_chosen = random.sample(core_names, core_count) if core_names else []
+            flex_chosen = random.sample(flex_names, flex_count) if flex_names else []
+            plaid_chosen = random.sample(plaid_names, plaid_count) if plaid_names else []
     
             # Flatten into one list with (name, desc) pairs
             C["GENRE_OPTIONS"] = core_chosen + flex_chosen + plaid_chosen
@@ -1757,6 +1673,7 @@ elif mode == "Create Direct":
         lines = []
         idx = 1
         if genres:
+            # split back into groups
             start = 0
             end = start + min(3, len(genres) - start)
             core_block = genres[start:end]
@@ -1792,14 +1709,14 @@ elif mode == "Create Direct":
         if not any("Pick your genre" in m for _, m in chat):
             add_message("assistant",
                 f"📚 {active_quip}: Pick your genre:\n{menu}\n\n"
-                "👉 You can type either the number or part of the genre name."
+                "👉 You can type either the number or the genre name."
             )
             st.rerun()
     
         v = st.text_input(f"Your choice (1-{reshuf_idx} or genre name)", key="cd_genre_pick")
         if st.button("Submit genre"):
             add_message("user", v)
-            c = v.strip().lower()
+            c = v.strip()
     
             # Handle reshuffle
             if c == str(reshuf_idx):
@@ -1858,20 +1775,12 @@ elif mode == "Create Direct":
                 st.session_state.GLOBAL["CURRENT_STEP"] = 3
                 st.rerun()
     
+            # Handle custom genre
             else:
-                # Partial text match
-                match = next(
-                    (n for n, _ in genres if c in n.lower()), None
-                )
-                if match:
-                    C["GENRE_SELECTED"] = match
-                    add_message("assistant", f"✅ {active_quip}: Selected Genre → {C['GENRE_SELECTED']}")
-                    st.session_state.GLOBAL["CURRENT_STEP"] = 3
-                    st.rerun()
-                else:
-                    add_message("assistant", "❌ Invalid choice. Please enter a number or part of a listed genre name.")
-                    st.session_state.GLOBAL["CURRENT_STEP"] = 2
-                    st.rerun()
+                C["GENRE_SELECTED"] = c
+                add_message("assistant", f"✨ {active_quip}: Custom Genre Selected → {C['GENRE_SELECTED']}")
+                st.session_state.GLOBAL["CURRENT_STEP"] = 3
+                st.rerun()
 
 
 
@@ -1982,7 +1891,7 @@ elif mode == "Create Direct":
             "2. Dial It Up - Switch to humorous dialect\n"
             "3. Style It Up - Retell in different literary style\n"
             "4. Plaidgerize - Rewrite with maximum absurdity\n"
-            "5. PlaidMag-Gen It - Generate 3 Panel image\n"
+            "5. PlaidMag-Gen It - Generate image 3 Panel\n"
             "6. New Story - Start over\n",
             language="text",
         )
@@ -2143,16 +2052,10 @@ elif mode == "Storyline":
     elif step == 5 and st.session_state.generated_story:
         emit_once(
             "post_options",
-            "📌 **Post-Story Options:**\n\n"
-            "1. Fluff It Up — Add softness, poetic language, whimsy\n"
-            "2. Dial It Up — Switch to humorous dialect\n"
-            "3. New Style — Retell in a different literary style\n"
-            "4. Plaidgerize — Rewrite with maximum absurdity\n"
-            "5. PlaidMagGen-It — Generate matching 3-Panel Image\n"
-            "6. Start Over — Begin fresh\n\n"
-            "👉 Type **1–6** to choose."
+            "📌 **Post-Story Options:**\n"
+            "1) Fluff It Up\n2) Dial It Up\n3) New Style\n4) Plaidgerize (max absurd)\n5) Start Over\n\n"
+            "Type **1–5**."
         )
-
 
     # ---------- single chat input ----------
     placeholder = {
@@ -2160,7 +2063,7 @@ elif mode == "Storyline":
         2: "Pick 1–7…",
         3: "Pick 1–4…",
         4: "Type generate…",
-        5: "Pick 1–6…",
+        5: "Pick 1–5…",
     }.get(step, "Type here…")
 
     user_msg = st.chat_input(placeholder)
@@ -2194,42 +2097,31 @@ elif mode == "Storyline":
 
     # ---------- Step 2: Style ----------
     elif step == 2:
-        c = user_msg.strip().lower()
+        c = user_msg.strip()
         styles = S["STYLE_OPTIONS"]
     
-        # Handle reshuffle
         if c == "7":
             S.pop("STYLE_OPTIONS", None)
             S["emitted"].discard("style_prompt")
             say("assistant", "🔄 Reshuffling styles…")
     
-        # Handle wild card
         elif c == "6":
             S["STYLE_SELECTED"] = random.choice([s[0] for s in styles])
             say("assistant", f"🎨 Style chosen: **{S['STYLE_SELECTED']}**")
             G["CURRENT_STEP"] = 3
     
-        # Handle numbered styles
-        elif c.isdigit() and 1 <= int(c) <= len(styles):
+        elif c in {"1","2","3","4","5"}:
             S["STYLE_SELECTED"] = styles[int(c)-1][0]
             say("assistant", f"🎨 Style chosen: **{S['STYLE_SELECTED']}**")
             G["CURRENT_STEP"] = 3
     
         else:
-            # Partial text match
-            match = next(
-                (n for n, _ in styles if c in n.lower()), None
-            )
-            if match:
-                S["STYLE_SELECTED"] = match
-                say("assistant", f"🎨 Style chosen: **{S['STYLE_SELECTED']}**")
-                G["CURRENT_STEP"] = 3
-            else:
-                say("assistant", "❌ Invalid choice. Please enter a number or part of a style name.")
-                G["CURRENT_STEP"] = 2
+            # Treat input as a custom style
+            S["STYLE_SELECTED"] = c
+            say("assistant", f"🎨 Custom style chosen: **{S['STYLE_SELECTED']}**")
+            G["CURRENT_STEP"] = 3
     
         st.rerun()
-
 
 
     # ---------- Step 3: Absurdity ----------
@@ -2314,58 +2206,27 @@ elif mode == "Storyline":
             )
             st.session_state.generated_story = remixed
             S["chat"].append(("assistant", f"✨ **Remixed story:**\n\n{remixed}"))
-        
         elif v == "5":
-            with st.spinner("🎨 Generating PlaidMagGen visuals..."):  # PlaidMagGen-It
-                try:
-                    story_text = st.session_state.get("generated_story", "")
-                    if not story_text:
-                        st.error("⚠️ No story available for image generation.")
-                    else:
-                        img = plaidmag_gen(story_text)
-                        if img:
-                            st.session_state.generated_image = img
-                            st.image(
-                                img,
-                                caption="🎨 PlaidMagGen Comic",
-                                use_container_width=True
-                            )
-        
-                            # Optional: Download button
-                            buf = BytesIO()
-                            img.save(buf, format="PNG")
-                            st.download_button(
-                                label="📥 Download Comic as PNG",
-                                data=buf.getvalue(),
-                                file_name="plaidmaggen_comic.png",
-                                mime="image/png",
-                            )
-                        else:
-                            st.error("⚠️ Image generation failed — no image returned.")
-                except Exception as e:
-                    st.error(f"❌ PlaidMagGen failed: {e}")
-
-        elif v == "6":
             reset_mode("Storyline")
             st.rerun()
         else:
             say("assistant", "❌ Please pick **1–5**.")
             st.rerun()
 
-            # Post-story buttons
-            st.subheader("Post-Story Options")
-            st.download_button(
-                label="📥 Download Story",
-                data=st.session_state.generated_story,
-                file_name="storyline_story.txt",
-                mime="text/plain",
-            )
-            if st.button("Restart Storyline"):
-                reset_mode("Storyline")
-                st.rerun()
+        # Post-story buttons
+        st.subheader("Post-Story Options")
+        st.download_button(
+            label="📥 Download Story",
+            data=st.session_state.generated_story,
+            file_name="storyline_story.txt",
+            mime="text/plain",
+        )
+        if st.button("Restart Storyline"):
+            reset_mode("Storyline")
+            st.rerun()
 
-        
-    
+
+
 
 # 4) PLAIDPIC (Upload-to-Story Visual Remix)
 elif mode == "PlaidPic":
@@ -3400,4 +3261,50 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
