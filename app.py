@@ -1332,16 +1332,9 @@ if mode == "Lib-Ate":
                 f"{macquip_aside('If you draw a blank, type “surprise me”.', 'Lib-Ate')}\n\n"
                 "Your answer (or type \"surprise me\"):"
             )
-            #add_message(active_quip)
-            if L.get("last_prompt_idx") != idx:
-                msg = (
-                    f"Prompt {idx+1} of {L['PROMPTS_NEEDED']}:\n\n"
-                    f"**{title}**\n{helptext}\n\n"
-                    f"{macquip_aside('If you draw a blank, type “surprise me”.', 'Lib-Ate')}"
-                )
-                add_message(active_quip, quip_speak(active_quip, "prompt", msg))
-                L["last_prompt_idx"] = idx
-                st.rerun()
+            add_message("assistant", msg)
+            L["last_prompt_idx"] = idx
+            st.rerun()
     
         # One input per prompt index
         v = st.text_input("Answer", key=f"libate_word_input_{idx}")
@@ -3268,6 +3261,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
