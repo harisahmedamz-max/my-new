@@ -1362,11 +1362,16 @@ if mode == "Lib-Ate":
     
         # ✅ If all prompts done, stay here once to show full chat
         if idx >= L["PROMPTS_NEEDED"]:
-            st.markdown("✅ All prompts collected! Continue to the next step.")
-            if st.button("Next →"):
+            # Show a final assistant confirmation message
+            if L.get("finished_prompts") is not True:
+                st.session_state["CHAT_LOG"].append(
+                    ("assistant", "✅ All prompts collected! Let's move on to the story...")
+                )
+                L["finished_prompts"] = True
+            else:
+                # On next rerun, proceed to step 5
                 st.session_state.GLOBAL["CURRENT_STEP"] = 5
                 st.rerun()
-            st.stop()
     
         # Ask next prompt
         key_name, title, helptext = session_prompts[idx]
@@ -3425,6 +3430,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
