@@ -7,7 +7,6 @@
 # - PlaidMagGen (visual prompt builder; outputs rich image prompt spec)
 # - PlaidPlay (multiplayer simulation: prompt → faux submissions → voting)
 # - PlaidChat (continuous chat interface with Quip personas)
-#
 # No external APIs required. Runs offline. All state kept in st.session_state.
 import requests
 from io import BytesIO
@@ -1354,9 +1353,12 @@ if mode == "Lib-Ate":
     
         # --- Render chat so far ---
         for role, text in st.session_state.get("CHAT_LOG", []):
-            # role label removed → no emojis
-            with st.chat_message("", avatar=""):
-                st.markdown(text)
+            if role == "assistant":
+                with st.chat_message("assistant", avatar=" "):  # blank avatar
+                    st.markdown(text)
+            else:
+                with st.chat_message("user", avatar=" "):       # blank avatar
+                    st.markdown(text)
     
         # ✅ If all prompts done, stay here once to show full chat
         if idx >= L["PROMPTS_NEEDED"]:
@@ -3423,6 +3425,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
