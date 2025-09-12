@@ -1770,40 +1770,46 @@ if mode == "Lib-Ate":
                         st.rerun()
     
             # Step 2: Generate once format is chosen
+            # Step 2: Generate once format is chosen
             else:
                 selected_format = st.session_state.plaidmag_format
                 st.success(f"✅ Format selected: {selected_format}")
-    
+            
                 if st.button("Generate Image", key="plaidmag_generate"):
                     with st.spinner(f"🎨 Generating {selected_format}..."):
                         try:
                             img = plaidmag_gen(story_text, format_name=selected_format)
                             if img:
                                 st.session_state.generated_image = img
-                                st.image(
-                                    img,
-                                    caption=f"🎨 PlaidMagGen - {selected_format}",
-                                    use_container_width=True
-                                )
-                                # Download option
-                                buf = BytesIO()
-                                img.save(buf, format="PNG")
-                                st.download_button(
-                                    label="📥 Download Image",
-                                    data=buf.getvalue(),
-                                    file_name=f"plaidmaggen_{selected_format.replace(' ', '_').lower()}.png",
-                                    mime="image/png",
-                                )
                             else:
                                 st.error("⚠️ Image generation failed — no image returned.")
                         except Exception as e:
                             st.error(f"❌ PlaidMagGen failed: {e}")
-    
+            
+                # ✅ Always display stored image if available
+                if "generated_image" in st.session_state:
+                    img = st.session_state.generated_image
+                    st.image(
+                        img,
+                        caption=f"🎨 PlaidMagGen - {selected_format}",
+                        use_container_width=True
+                    )
+                    # Download option
+                    buf = BytesIO()
+                    img.save(buf, format="PNG")
+                    st.download_button(
+                        label="📥 Download Image",
+                        data=buf.getvalue(),
+                        file_name=f"plaidmaggen_{selected_format.replace(' ', '_').lower()}.png",
+                        mime="image/png",
+                    )
+            
                 if st.button("⬅️ Back to Post-Story Menu"):
                     st.session_state.pop("plaidmag_mode", None)
                     st.session_state.pop("plaidmag_format", None)
-                    st.session_state.pop("generated_image", None)
+                    st.session_state.pop("generated_image", None)  # clear image too
                     st.rerun()
+
     
         # --- Normal Post-story menu ---
         else:
@@ -3810,6 +3816,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
