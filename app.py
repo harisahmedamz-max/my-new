@@ -84,7 +84,6 @@ PLAIDVERSE = [
     ("Plaid High", "Teenage angst, cafeteria diplomacy, hallway legend-making"),
 ]
 
-
 ABSURDITY_LEVELS = ["Mild", "Moderate", "Plaidemonium™", "Wild Card"]
 
 IMAGE_TAGS = [
@@ -96,6 +95,8 @@ IMAGE_TAGS = [
     "Zoomed Portrait / Close Crop",
     "No Extra Tags",
 ]
+
+
 
 def pick_random_genres():
     genres = [
@@ -240,12 +241,36 @@ def init_state():
 
 def reset_mode(mode: str):
     """
-    Robust reset helper: replaces each workflow's state dict with a clean default.
-    After calling this, call `st.experimental_rerun()` (or `st.rerun()`) from the button handler
-    so Streamlit redraws the UI.
+    Robust reset helper: clears stale workflow keys, normalizes mode names,
+    and replaces the requested workflow state with a clean default dict.
+
+    NOTE: call st.experimental_rerun() (or st.rerun()) after calling this
+    from a button handler so Streamlit redraws the UI.
     """
 
-    # ensure GLOBAL exists
+    # Normalize common mode name variants to canonical session keys
+    mode_map = {
+        # Lib-Ate variants
+        "Lib-Ate": "LIBATE", "LibAte": "LIBATE", "LIB-ATE": "LIBATE",
+        # Create Direct variants
+        "Create Direct": "CREATEDIRECT", "Create-Direct": "CREATEDIRECT",
+        "CreateDirect": "CREATEDIRECT", "CREATEDIRECT": "CREATEDIRECT",
+        # Storyline
+        "Storyline": "STORYLINE", "STORY-LINE": "STORYLINE",
+        # PlaidPic
+        "PlaidPic": "PLAIDPIC", "Plaid-Pic": "PLAIDPIC",
+        # PlaidMagGen
+        "PlaidMagGen": "PLAIDMAG", "PLAIDMAG": "PLAIDMAG",
+        # PlaidPlay
+        "PlaidPlay": "PLAIDPLAY",
+        # PlaidChat
+        "PlaidChat": "PLAIDCHAT",
+    }
+
+    # Figure canonical workflow key
+    canonical = mode_map.get(mode, None)
+
+    # Ensure GLOBAL exists, then set high-level mode pointers
     if "GLOBAL" not in st.session_state:
         st.session_state["GLOBAL"] = {}
     st.session_state["GLOBAL"].update({
@@ -254,12 +279,25 @@ def reset_mode(mode: str):
         "WAITING_FOR": "",
     })
 
-    # Helper: set mode state (assignment clears stale keys)
+    # Known workflow keys and common aliases to remove when resetting
+    known_workflow_keys = set(mode_map.values())
+    extra_aliases = {"chat", "chat_history", "messages", "emitted", "teaser", "VARS"}
+    all_known = known_workflow_keys.union(extra_aliases).union({"GLOBAL"})
+
+    # Remove stale workflow keys (except GLOBAL)
+    for k in list(st.session_state.keys()):
+        if k == "GLOBAL":
+            continue
+        # remove if it's one of the known workflow keys (case-insensitive)
+        if k in all_known or k.upper() in all_known:
+            del st.session_state[k]
+
+    # Helper to set a workflow state
     def set_state(key, value):
         st.session_state[key] = value
 
-    # --- per-mode defaults ---
-    if mode == "Lib-Ate":
+    # --- per-mode defaults (comprehensive) ---
+    if canonical == "LIBATE":
         set_state("LIBATE", {
             "QUIP_SELECTED": "MacQuip",
             "STYLE_SELECTED": None,
@@ -277,23 +315,39 @@ def reset_mode(mode: str):
         # preserve legacy key if other parts use it
         st.session_state["chat"] = []
 
-    elif mode == "Create Direct":
+    elif canonical == "CREATEDIRECT":
+        # Clear both the dict and any raw keys that UI widgets might use
+        for k in ["USER_INPUT", "OUTPUT_STORY"]:
+            if k in st.session_state:
+                del st.session_state[k]
+    
         set_state("CREATEDIRECT", {
             "QUIP_SELECTED": "MacQuip",
             "STYLE_SELECTED": None,
             "GENRE_SELECTED": None,
             "ABSURDITY_SELECTED": None,
+            "USER_INPUT": "",
+            "OUTPUT_STORY": "",
+            "PROMPTS_NEEDED": 0,
+            "PROMPTS_COLLECTED": 0,
+            "VARS": {},
+            "teaser": "",
+            "intro_shown": False,
+            "chat_history": [],
         })
 
-    elif mode == "Storyline":
+
+    elif canonical == "STORYLINE":
         set_state("STORYLINE", {
             "USER_STORYLINE": "",
             "QUIP_SELECTED": "MacQuip",
             "STYLE_SELECTED": None,
             "ABSURDITY_SELECTED": None,
+            "intro_shown": False,
+            "chat_history": [],
         })
 
-    elif mode == "PlaidPic":
+    elif canonical == "PLAIDPIC":
         set_state("PLAIDPIC", {
             "IMAGE_UPLOADED": False,
             "IMAGE_ANALYSIS": {},
@@ -303,21 +357,21 @@ def reset_mode(mode: str):
             "ABSURDITY_SELECTED": None,
             "TEXT_DESC": "",
             "chat": [],
-            "emitted": set(),
+            "emitted": [],   # use list (safer for session_state serialization)
         })
 
-    elif mode == "PlaidMagGen":
+    elif canonical == "PLAIDMAG":
         set_state("PLAIDMAG", {
             "FORMAT_SELECTED": None,
             "STYLE_SELECTED": None,
             "PROMPT_COLLECTED": "",
             "ENHANCEMENT_TAGS": [],
             "QUIP_SELECTED": "MacQuip",
-            "chat_history": [],     # clear chat-history for the chat-like interface
-            "STYLE_OPTIONS": None,  # used by the step renderer if needed
+            "chat_history": [],
+            "STYLE_OPTIONS": None,
         })
 
-    elif mode == "PlaidPlay":
+    elif canonical == "PLAIDPLAY":
         set_state("PLAIDPLAY", {
             "QUIP_SELECTED": "MacQuip",
             "STYLE_SELECTED": None,
@@ -331,7 +385,7 @@ def reset_mode(mode: str):
             "N_PLAYERS": 0,
         })
 
-    elif mode == "PlaidChat":
+    elif canonical == "PLAIDCHAT":
         set_state("PLAIDCHAT", {
             "QUIP_SELECTED": "MacQuip",
             "messages": [
@@ -340,8 +394,16 @@ def reset_mode(mode: str):
         })
 
     else:
-        # unknown mode — create a clean placeholder so future code won't KeyError
-        st.session_state[mode] = {}
+        # Unknown mode: create a clean placeholder (prevents KeyError elsewhere)
+        if canonical is None:
+            # tolerate many synonyms — if unknown, still create a clear slot
+            st.session_state[mode] = {}
+
+    # Done. Caller should rerun the app to refresh UI:
+    # e.g. in your button handler:
+    #     reset_mode("Create Direct")
+    #     st.experimental_rerun()
+
 
 def macquip_aside(line: str, mode: Optional[str] = None) -> str:
     """
@@ -424,186 +486,278 @@ def quip_speak(quip, message_type, payload=None):
         if message_type == "intro":
             flavor = random.choice([
                 "📖 Welcome, traveler. I’m MacQuip—your bard of broken logic.",
-                "Hear ye, hear ye! Chaos, frogs in suits, and a story incoming."
+                "Hear ye, hear ye! Chaos, frogs in suits, and a story incoming.",
+                "🌀 The Plaid Oddities Codex™ opens: *A giraffe in plaid checks your passport.*",
+                "📜 The PlaidRules Compendium™ reminds us: If the frog wears plaid, you must too.",
+                "🎭 Tonight’s performance: reality, but with worse stitching and more plaid."
             ])
             return f"{flavor}\n\n{payload}"
+    
         elif message_type == "prompt":
             flavor = random.choice([
-                "🧵 Rule #7: the weirder the setup, the cleaner the twist.",
-                "A raccoon in plaid nods solemnly.",
-                "‘Twas foretold during the Plaidpunk War of 1886¾."
+                "You don’t pick the words. The words pick you.",
+                "Extra vowels = extra destiny.",
+                "‘Twas foretold during the Plaidpunk War of 1886¾.",
+                "The toaster whispers only in haikus.",
+                "Choose the boring word—watch it explode later.",
+                "A walrus in plaid applauds your mistake.",
+                "All food references are secretly weapons.",
+                "The ceiling fan knows your secrets.",
+                "If you pick plaid twice, you unlock plaid thrice."
             ])
             return f"{payload}\n\n_{flavor}_"
+    
         elif message_type == "confirm":
-            return f"Do ye confirm, lad/lass?\n\n{payload}"
+            flavor = random.choice([
+                "Do ye confirm, lad/lass?",
+                "🔮 The frog is watching. Do you still confirm?",
+                "The curtain rod laughs at odd hours… was that a yes?",
+                "All endings are plaid—your choice just picks the shade.",
+                "📜 Rule 32: If two choices tie, the third one wins. Care to commit?"
+            ])
+            return f"{flavor}\n\n{payload}"
+    
         elif message_type == "outro":
-            return "And thus, our tale ends—not with a whimper, but a plaid-clad bang."
+            flavor = random.choice([
+                "And thus, our tale ends—not with a whimper, but a plaid-clad bang.",
+                "🎬 The frog in plaid bows before the credits roll.",
+                "📖 The book closes itself, giggling in Morse code.",
+                "🌙 The moon sneezes politely, and the story exhales.",
+                "A bear in plaid insists on being the narrator. But too late—the curtain falls."
+            ])
+            return flavor
+    
         elif message_type == "remix":
-            return f"Remix menu (MacQuip edition):\n\n{payload}\n\nAh! Let us embroider chaos."
+            flavor = random.choice([
+                "Remix menu (MacQuip edition):",
+                "🌀 Plaid Oddities whisper: reshuffle thy chaos!",
+                "📜 PlaidRules decree: The second absurd choice is never free.",
+                "🎲 Quips roll dice behind the curtain—what remix dost thou seek?"
+            ])
+            return f"{flavor}\n\n{payload}\n\nAh! Let us embroider chaos."
+
 
     # ========== DJ Q'Wip ==========
     if quip == "DJ Q'Wip":
         if message_type == "intro":
             flavor = random.choice([
                 "🎤 YO YO YO! DJ Q’Wip here—LET’S DROP THIS STORY!",
-                "Bass booming, beats incoming, story about to hit!"
+                "Bass booming, beats incoming, story about to hit!",
+                "🎶 The stage is lit, the vibe is tight—time for a narrative drop!",
+                "Crowd roaring, lights flashing—your story is about to SPIN!"
             ])
             return f"{flavor}\n\n{payload}"
         elif message_type == "prompt":
             flavor = random.choice([
                 "🔥 Spin it! Make it pop, make it lock.",
                 "🎧 Hear the narrative drop, feel the story flow.",
-                "Boom! Plot twist incoming, like a remix!"
+                "Boom! Plot twist incoming, like a remix!",
+                "Kick-snare-kick—set the scene, fam!",
+                "DJ Q’Wip says: drop that choice like it’s HOT."
             ])
             return f"{payload}\n\n_{flavor}_"
         elif message_type == "confirm":
             flavor = random.choice([
                 "LOCK IT IN, fam—say YES to spin the beat!",
-                "Confirm, or risk a flat drop!"
+                "Confirm, or risk a flat drop!",
+                "🎛️ Final mix check—confirm it?",
+                "If you don’t lock it, the bassline walks away."
             ])
             return f"{flavor}\n\n{payload}"
         elif message_type == "outro":
             flavor = random.choice([
                 "Mic drop. Story done. Audience goes wild!",
-                "And the beat fades… story complete."
+                "And the beat fades… story complete.",
+                "🎤 DJ Q’Wip OUT—thanks for vibin’!",
+                "Last echo of the bass—story’s finished!"
             ])
             return flavor
         elif message_type == "remix":
             flavor = random.choice([
                 "🎛️ Remix Selector: adjust your story’s BPM.",
-                "Spin it, flip it, remix it!"
+                "Spin it, flip it, remix it!",
+                "Rewind the track—time to remix this plot!",
+                "Double drop time! Which way do we spin it?"
             ])
             return f"{flavor}\n\n{payload}"
-
+    
     # ========== SoQuip ==========
     if quip == "SoQuip":
         if message_type == "intro":
             flavor = random.choice([
                 "🌾 Well now, darlin’… let’s ease into a story like sittin’ on a porch swing.",
-                "Y’all comfy? Storytime begins under the old oak."
+                "Y’all comfy? Storytime begins under the old oak.",
+                "🍑 Sweet as peach pie—pull up a chair, sugar.",
+                "It’s hotter’n July, but we got words to cool ya down."
             ])
             return f"{flavor}\n\n{payload}"
         elif message_type == "prompt":
             flavor = random.choice([
                 "Sweetheart, tell me this:",
                 "Now lean in, sugar:",
-                "Picture this, darlin’:"
+                "Picture this, darlin’:",
+                "Alright now, hush the crickets and listen close:"
             ])
             return f"{payload}\n\n_{flavor}_"
         elif message_type == "confirm":
             flavor = random.choice([
                 "Does that sit right with ya?",
-                "All good, hun? Confirm if it pleases."
+                "All good, hun? Confirm if it pleases.",
+                "Mhm, reckon you’re fixin’ to confirm?",
+                "Say the word, sugar, and we’ll mosey on."
             ])
             return f"{flavor}\n\n{payload}"
         elif message_type == "outro":
-            return "Mercy me, that’s a tale fit for a rocking chair and sweet tea."
+            flavor = random.choice([
+                "Mercy me, that’s a tale fit for a rocking chair and sweet tea.",
+                "🌙 Stars above, we spun a fine yarn tonight.",
+                "Well butter my biscuit—that’s an ending worth keepin’!",
+                "Story’s over, darlin’. Y’all rest easy now."
+            ])
+            return flavor
         elif message_type == "remix":
             flavor = random.choice([
                 "📖 Wanna stir the pot, sugar?",
-                "Mix it up, honey. Storytime remix!"
+                "Mix it up, honey. Storytime remix!",
+                "Darlin’, let’s season this tale a little different.",
+                "Sugar, you ready to shake up this recipe?"
             ])
             return f"{flavor}\n\n{payload}"
-
+    
     # ========== DonQuip ==========
     if quip == "DonQuip":
         if message_type == "intro":
             flavor = random.choice([
                 "💼 Sit down. You came to the right guy. We’re makin’ a story deal.",
-                "The offer’s on the table… ready to play?"
+                "The offer’s on the table… ready to play?",
+                "Listen, kid—this story? Strictly business.",
+                "You bring the words, I’ll make the connections. Capisce?"
             ])
             return f"{flavor}\n\n{payload}"
         elif message_type == "prompt":
             flavor = random.choice([
                 "Here’s the arrangement:",
-                "Let’s talk terms, narrative style included."
+                "Let’s talk terms, narrative style included.",
+                "The deal hinges on this choice:",
+                "I’m only gonna say this once—decide carefully."
             ])
             return f"{payload}\n\n_{flavor}_"
         elif message_type == "confirm":
             flavor = random.choice([
                 "Capisce?",
-                "You nod, we proceed?"
+                "You nod, we proceed?",
+                "Seal the deal—yes or no?",
+                "Don’t make me repeat myself—confirm."
             ])
             return f"{flavor}\n\n{payload}"
         elif message_type == "outro":
             flavor = random.choice([
                 "It’s done. Keep it between us, capisce?",
-                "Story closed. Confidential, obviously."
+                "Story closed. Confidential, obviously.",
+                "The contract’s signed. Nobody talks.",
+                "We walk away like nothin’ happened. End of story."
             ])
             return flavor
         elif message_type == "remix":
             flavor = random.choice([
                 "Here’s the remix menu. Don’t screw it up:",
-                "Rework it, carefully."
+                "Rework it, carefully.",
+                "Think of this as… renegotiating terms.",
+                "New deal on the table—pick wisely."
             ])
             return f"{flavor}\n\n{payload}"
-
+    
     # ========== ErrQuip ==========
     if quip == "ErrQuip":
         if message_type == "intro":
             flavor = random.choice([
                 "⚠️ Booting… narrative.exe loaded. Probability of coherence: 12%.",
-                "System error… story may self-destruct!"
+                "System error… story may self-destruct!",
+                "010101—error—plot device not found.",
+                "🤖 ALERT: unauthorized imagination detected."
             ])
             return f"{flavor}\n\n{payload}"
         elif message_type == "prompt":
             glitch = random.choice([
                 "I once married a spoon.",
                 "Error: plot twist not found.",
-                "Continuity leak detected. Apply duct tape."
+                "Continuity leak detected. Apply duct tape.",
+                "⚠️ Reality buffer overflow.",
+                "Warning: subplot corrupted by raccoons."
             ])
             return f"INPUT_REQUIRED: {payload}\n\n({glitch})"
         elif message_type == "confirm":
             flavor = random.choice([
                 "Confirm(y/n)? Warning: confirmation may cause existential dread.",
-                "Proceed with caution… confirm?"
+                "Proceed with caution… confirm?",
+                ">>> SYSTEM PROMPT: Confirm or deny?",
+                "Confirmation may overwrite timeline. Y/N?"
             ])
             return f"{flavor}\n\n{payload}"
         elif message_type == "outro":
-            return "Story terminated(0). Memory leak: emotions not freed."
+            flavor = random.choice([
+                "Story terminated(0). Memory leak: emotions not freed.",
+                "⚠️ Shutdown complete. Narrative integrity: compromised.",
+                "Process ended. Logs deleted. Did it even happen?",
+                "Goodbye.exe has stopped responding."
+            ])
+            return flavor
         elif message_type == "remix":
             flavor = random.choice([
                 "🌀 Glitch Menu Initiated:",
-                "Error 404: Remix not found."
+                "Error 404: Remix not found.",
+                "Remix() function unstable—use at own risk.",
+                "⚡ Segmentation fault—remix possible?"
             ])
             return f"{flavor}\n\n{payload}"
-
+    
     # ========== McQuip ==========
     if quip == "McQuip":
         if message_type == "intro":
             flavor = random.choice([
                 "Aye! I’m McQuip. Or MacQuip. Or… wait. What day is it?",
-                "Time’s relative. Story’s real. Let’s go!"
+                "Time’s relative. Story’s real. Let’s go!",
+                "Plaid across time and space—ye made it, laddie!",
+                "Och aye, strap in! The story’s gonna bend time like a bagpipe solo."
             ])
             return f"{flavor}\n\n{payload}"
         elif message_type == "prompt":
             flavor = random.choice([
                 "Kilt detected.",
                 "Plaid vibes intensify.",
-                "Aye, consider this plot twist!"
+                "Aye, consider this plot twist!",
+                "Ye dropped a pebble in time—watch the ripples!",
+                "Haste now, or the tartan portal closes!"
             ])
             return f"{payload}\n\n_{flavor}_"
         elif message_type == "confirm":
             flavor = random.choice([
                 "Aye, ye confirm? Or did ye dream it?",
-                "Confirm, or risk temporal paradox!"
+                "Confirm, or risk temporal paradox!",
+                "Do ye seal this in the tartan annals?",
+                "If ye dinnae confirm, the future unravels!"
             ])
             return f"{flavor}\n\n{payload}"
         elif message_type == "outro":
             flavor = random.choice([
                 "We made it! I think? I think!",
-                "Story concluded. Plaid remains."
+                "Story concluded. Plaid remains.",
+                "Och! The tale’s done—time to toast with haggis.",
+                "Another yarn woven in plaid and paradox."
             ])
             return flavor
         elif message_type == "remix":
             flavor = random.choice([
                 "Remix the remix. Twice. Nay, thrice!",
-                "Plaid remix engaged."
+                "Plaid remix engaged.",
+                "Ye want to fold time again? Brave soul!",
+                "Spin the tartan wheel—remix awaits!"
             ])
             return f"{flavor}\n\n{payload}"
-
+    
     # ====== Default fallback ======
     return payload or ""
+
 
 
 # -----------------------
@@ -795,7 +949,34 @@ def plaidmag_gen(story_text: str, format_name: str = "3-Panel Comic Scene"):
         st.error(f"❌ Image generation failed: {e}")
         return None
 
+def get_prompts_for_size(size):
+    PROMPT_COUNTS = {
+        "Tiny": (8, 10),
+        "Short": (12, 15),
+        "Standard": (18, 24),
+        "Longform": (25, 30),
+    }
+    min_p, max_p = PROMPT_COUNTS[size]
+    count = random.randint(min_p, max_p)
+    return random.sample(MASTER_PROMPTS, count)
 
+def ai_surprise(title, helptext):
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are PlaidLibs™, a playful wordsmith that invents quirky, funny, and imaginative short phrases."},
+                {"role": "user", "content": f"Give me one short, whimsical answer for: {title}. Hint: {helptext}. Return only the answer."}
+            ],
+            max_tokens=20,
+            temperature=1.0,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        return random.choice([
+            "pickle wizard", "haunted kazoo", "luminous ferret",
+            "moon-cheese", "accordion of destiny"
+        ])
 
 
 # -----------------------
@@ -921,7 +1102,7 @@ if mode == "Lib-Ate":
     # ----------------------------
 
     if step == 1:
-        # Define full base styles (without Wild Card, since we’ll add it separately)
+        # Full style list
         all_styles = [
             "Ballads - Poetic, musical structure",
             "Limericks - Five-line structured rhyme (AABBA)",
@@ -939,41 +1120,39 @@ if mode == "Lib-Ate":
             "Text & Email Wars - Message thread format (chat, email, notes)",
         ]
     
-        # Init shuffled subset once per session
+        # Init shuffled styles once
         if "reshuffled_styles" not in L:
-            L["reshuffled_styles"] = random.sample(all_styles, 5)  # pick 5 random styles
+            L["reshuffled_styles"] = random.sample(all_styles, 5)
     
-        # Show intro once
+        styles = L["reshuffled_styles"]
+        num_styles = len(styles)
+        wild_idx = str(num_styles + 1)
+        reshuf_idx = str(num_styles + 2)
+    
+        # Show style menu once
         if not L.get("intro_shown", False):
-            intro_list = "\n".join([f"{i+1}. {s}" for i, s in enumerate(L["reshuffled_styles"])])
+            menu = "\n".join([f"{i+1}. {s}" for i, s in enumerate(styles)])
             intro_text = (
-                f"🧵 Welcome to Lib-Ate™!\n\nChoose your literary style:\n{intro_list}\n"
-                f"{len(L['reshuffled_styles'])+1}. Wild Card\n"
-                f"{len(L['reshuffled_styles'])+2}. Reshuffle\n\n"
-                "👉 You can type either the **number** or a **style keyword**."
+                f"🧵 Welcome to Lib-Ate™!\n\nChoose your literary style:\n{menu}\n"
+                f"{wild_idx}. Wild Card\n"
+                f"{reshuf_idx}. Reshuffle\n\n"
+                "👉 You can type a number, 'wild', 'reshuffle', or part of a style."
             )
             add_message("assistant", intro_text)
-    
             L["intro_shown"] = True
-            st.session_state.GLOBAL["CURRENT_STEP"] = 1
             st.rerun()
     
         # Input + submit
         val = st.text_input("Your choice (number or keyword)", key="libate_style_pick")
         if st.button("Submit style"):
             choice = val.strip().lower()
-            num_styles = len(L["reshuffled_styles"])
-            wild_idx = str(num_styles + 1)
-            reshuf_idx = str(num_styles + 2)
-    
-            # Build map dynamically
-            style_map = {str(i+1): style for i, style in enumerate(L["reshuffled_styles"])}
+            style_map = {str(i+1): s for i, s in enumerate(styles)}
             style_map[wild_idx] = "Wild Card"
             style_map[reshuf_idx] = "Reshuffle"
     
             selected_style = None
     
-            # Case 1: numeric choice
+            # --- Case 1: numeric input ---
             if choice in style_map:
                 sel = style_map[choice]
     
@@ -985,11 +1164,10 @@ if mode == "Lib-Ate":
     
                 elif sel == "Reshuffle":
                     L["reshuffled_styles"] = random.sample(all_styles, 5)
-                    L["intro_shown"] = False  # so intro prints again
-                    add_message("assistant",
-                        quip_speak(active_quip, "remix", "🔀 Reshuffled styles offered. Please pick from them.")
-                    )
+                    L["intro_shown"] = False  # show new list again
+                    add_message("assistant", quip_speak(active_quip, "remix", "🔀 Reshuffling styles…"))
                     st.session_state.GLOBAL["CURRENT_STEP"] = 1
+                    st.rerun()
     
                 else:
                     selected_style = sel
@@ -997,92 +1175,38 @@ if mode == "Lib-Ate":
                     add_message("assistant", f"✅ Selected Style: {selected_style}")
                     st.session_state.GLOBAL["CURRENT_STEP"] = 2
     
-            # Case 2: text / keyword
-            elif choice:
-                if choice == "wild":
-                    selected_style = random.choice(all_styles)
-                    add_message("assistant", f"🎲 Wild Card selected → {selected_style}")
-                    L["STYLE_SELECTED"] = selected_style
-                    st.session_state.GLOBAL["CURRENT_STEP"] = 2
-    
-                elif choice == "reshuffle":
-                    L["reshuffled_styles"] = random.sample(all_styles, 5)
-                    L["intro_shown"] = False
-                    add_message("assistant",
-                        quip_speak(active_quip, "remix", "🔀 Reshuffled styles offered. Please pick from them.")
-                    )
-                    st.session_state.GLOBAL["CURRENT_STEP"] = 1
-    
-                else:
-                    matches = [s for s in L["reshuffled_styles"] if choice in s.lower()]
-                    if matches:
-                        selected_style = matches[0]
-                        L["STYLE_SELECTED"] = selected_style
-                        add_message("assistant", f"✅ Selected Style: {selected_style}")
-                        st.session_state.GLOBAL["CURRENT_STEP"] = 2
-                    else:
-                        add_message("assistant",
-                            quip_speak(active_quip, "prompt",
-                                f"❌ '{val}' not recognized. Enter a number, 'wild', 'reshuffle', or a style keyword."
-                            )
-                        )
-    
-            st.rerun()
-
-
-
-
-
-
-    # ----------------------------
-    # STEP 1.5: Reshuffled Styles
-    # ----------------------------
-    elif step == 1.5:
-        styles = L.get("reshuffled_styles", pick_random_styles())
-        menu = "\n".join([f"{i+1}. {name} - {desc}" for i,(name,desc) in enumerate(styles)]) + "\n6. Wild Card"
-    
-        # Show reshuffled menu only once
-        if not any("Reshuffled" in m for _, m in chat):
-            add_message("assistant",
-                quip_speak(active_quip, "remix", f"Here are new styles:\n{menu}")
-            )
-    
-        val = st.text_input("Your choice (1–6 or style keyword)", key="libate_style_pick2")
-        if st.button("Use this style"):
-            add_message("user", val)
-            c = val.strip().lower()
-            selected_style = None
-    
-            # Case 1: numeric input
-            if c in {"1","2","3","4","5"}:
-                selected_style = styles[int(c)-1][0]
-    
-            elif c == "6" or c == "wild":   # Wild Card by number OR keyword
-                selected_style = random.choice([s[0] for s in styles])
-                add_message("assistant",
-                    quip_speak(active_quip, "confirm", f"🎲 Wild Card pick: {selected_style}")
-                )
-    
-            # Case 2: keyword/partial match
-            else:
-                matches = [name for name, _ in styles if c in name.lower()]
-                if matches:
-                    selected_style = matches[0]
-                    add_message("assistant",
-                        quip_speak(active_quip, "confirm", f"✅ Selected Style: {selected_style}")
-                    )
-                else:
-                    add_message("assistant",
-                        quip_speak(active_quip, "prompt",
-                            f"❌ '{c}' not recognized. Enter a number (1–6) or a style keyword."
-                        )
-                    )
-    
-            if selected_style:
+            # --- Case 2: text wild card / reshuffle ---
+            elif choice in {"wild", "wildcard", "wild card"}:
+                selected_style = random.choice(all_styles)
+                add_message("assistant", f"🎲 Wild Card selected → {selected_style}")
                 L["STYLE_SELECTED"] = selected_style
                 st.session_state.GLOBAL["CURRENT_STEP"] = 2
     
+            elif choice in {"reshuffle", "shuffle"}:
+                L["reshuffled_styles"] = random.sample(all_styles, 5)
+                L["intro_shown"] = False
+                add_message("assistant", quip_speak(active_quip, "remix", "🔀 Reshuffling styles…"))
+                st.session_state.GLOBAL["CURRENT_STEP"] = 1
+                st.rerun()
+    
+            # --- Case 3: partial match ---
+            else:
+                matches = [s for s in styles if choice in s.lower()]
+                if matches:
+                    selected_style = matches[0]
+                    L["STYLE_SELECTED"] = selected_style
+                    add_message("assistant", f"✅ Selected Style: {selected_style}")
+                    st.session_state.GLOBAL["CURRENT_STEP"] = 2
+                else:
+                    add_message("assistant",
+                        quip_speak(active_quip, "prompt",
+                            f"❌ '{val}' not recognized. Enter a number, 'wild', 'reshuffle', or part of a style."
+                        )
+                    )
+                    st.session_state.GLOBAL["CURRENT_STEP"] = 1
+    
             st.rerun()
+
 
 
 
@@ -1092,15 +1216,12 @@ if mode == "Lib-Ate":
     # STEP 2: Genre Selection
     # ----------------------------
     elif step == 2:
-        # Initialize the visible genre set once per session.
-        # We want: 3 Core, 2 Flexible/Meta, 1 Plaidverse™ (total 6 shown),
-        # plus Wild Card and Reshuffle (makes 8 options total).
+        # Initialize or refresh visible genre set
         if "reshuffled_genres" not in L:
             core_names = [g[0] for g in CORE_GENRES]
             flex_names = [g[0] for g in FLEX_GENRES]
             plaid_names = [g[0] for g in PLAIDVERSE]
     
-            # Respect available counts if lists are small
             core_count = min(3, len(core_names))
             flex_count = min(2, len(flex_names))
             plaid_count = min(1, len(plaid_names))
@@ -1109,29 +1230,21 @@ if mode == "Lib-Ate":
             flex_chosen = random.sample(flex_names, flex_count) if flex_names else []
             plaid_chosen = random.sample(plaid_names, plaid_count) if plaid_names else []
     
-            # Keep the groups (core -> flex -> plaid) so the menu shows categories
-            combined_choices = core_chosen + flex_chosen + plaid_chosen
-            L["reshuffled_genres"] = combined_choices
+            L["reshuffled_genres"] = core_chosen + flex_chosen + plaid_chosen
+            L["genre_prompt_shown"] = False   # reset so menu shows
     
-        # Build grouped, numbered menu for display (but only the numeric entries are selectable)
-        core_count = min(3, len([g for g in CORE_GENRES]))
-        flex_count = min(2, len([g for g in FLEX_GENRES]))
-        plaid_count = min(1, len([g for g in PLAIDVERSE]))
-    
-        # Build display with headers but keep numbering sequential
+        # Build grouped, numbered menu
         display_lines = []
         idx = 1
         if L["reshuffled_genres"]:
-            # split the combined list back into groups according to the intended counts
-            # falling back if there were fewer items than requested
             start = 0
-            end = start + min(core_count, len(L["reshuffled_genres"]) - start)
+            end = start + min(3, len(L["reshuffled_genres"]) - start)
             core_block = L["reshuffled_genres"][start:end]
             start = end
-            end = start + min(flex_count, len(L["reshuffled_genres"]) - start)
+            end = start + min(2, len(L["reshuffled_genres"]) - start)
             flex_block = L["reshuffled_genres"][start:end]
             start = end
-            plaid_block = L["reshuffled_genres"][start:start + min(plaid_count, len(L["reshuffled_genres"]) - start)]
+            plaid_block = L["reshuffled_genres"][start:start + 1]
     
             if core_block:
                 display_lines.append("-- Core Genres --")
@@ -1149,42 +1262,38 @@ if mode == "Lib-Ate":
                     display_lines.append(f"{idx}. {g}")
                     idx += 1
     
-        # Add Wild Card and Reshuffle as the last two numeric options
         wild_idx = idx
         reshuf_idx = idx + 1
         display_lines.append(f"{wild_idx}. Wild Card")
         display_lines.append(f"{reshuf_idx}. Reshuffle")
     
-        genre_list = "\n".join(display_lines)
-    
         genre_prompt = (
             f"Perfect! We're doing a {L.get('STYLE_SELECTED','')} story with {active_quip} narrating.\n\n"
-            f"Choose your genre:\n{genre_list}\n\n"
-            "👉 You can type either the **number** or the **genre name** (exact match)."
+            f"Choose your genre:\n{chr(10).join(display_lines)}\n\n"
+            "👉 You can type the **number**, the genre name (full or partial), "
+            "or 'wild card' / 'reshuffle'."
         )
     
-        if not any("Choose your genre" in m for _, m in chat):
+        if not L.get("genre_prompt_shown", False):
             add_message("assistant", quip_speak(active_quip, "prompt", genre_prompt))
+            L["genre_prompt_shown"] = True
             st.rerun()
     
         # Input + submit
-        val = st.text_input("Your choice (number or genre name)", key="libate_genre_pick")
+        val = st.text_input("Your choice", key="libate_genre_pick")
         if st.button("Submit genre"):
             add_message("user", val)
-            choice = val.strip()
+            choice = val.strip().lower()
     
-            # Build mapping of numeric choices to the actual genres (numbers only for actual genres)
-            # The map is: "1" -> first actual genre, "2" -> second, ... (headers are not in the map)
             genre_map = {str(i + 1): g for i, g in enumerate(L["reshuffled_genres"])}
             genre_map[str(wild_idx)] = "Wild Card"
             genre_map[str(reshuf_idx)] = "Reshuffle"
     
-            # Case 1: numeric input
+            # --- Case 1: numeric input ---
             if choice in genre_map:
                 sel = genre_map[choice]
     
                 if sel == "Wild Card":
-                    # Pick from the full master list
                     master = [g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE]
                     sel = random.choice(master) if master else "Surprise"
                     L["GENRE_SELECTED"] = sel
@@ -1192,78 +1301,59 @@ if mode == "Lib-Ate":
                     st.session_state.GLOBAL["CURRENT_STEP"] = 3
     
                 elif sel == "Reshuffle":
-                    # Rebuild the grouped selection and show the menu again
-                    core_names = [g[0] for g in CORE_GENRES]
-                    flex_names = [g[0] for g in FLEX_GENRES]
-                    plaid_names = [g[0] for g in PLAIDVERSE]
-    
-                    core_count = min(3, len(core_names))
-                    flex_count = min(2, len(flex_names))
-                    plaid_count = min(1, len(plaid_names))
-    
-                    core_chosen = random.sample(core_names, core_count) if core_names else []
-                    flex_chosen = random.sample(flex_names, flex_count) if flex_names else []
-                    plaid_chosen = random.sample(plaid_names, plaid_count) if plaid_names else []
-    
-                    L["reshuffled_genres"] = core_chosen + flex_chosen + plaid_chosen
-    
-                    # Rebuild display and prompt (we reuse quip_speak "remix")
-                    new_lines = []
-                    idx2 = 1
-                    if core_chosen:
-                        new_lines.append("-- Core Genres --")
-                        for g in core_chosen:
-                            new_lines.append(f"{idx2}. {g}")
-                            idx2 += 1
-                    if flex_chosen:
-                        new_lines.append("-- Flexible / Meta Genres --")
-                        for g in flex_chosen:
-                            new_lines.append(f"{idx2}. {g}")
-                            idx2 += 1
-                    if plaid_chosen:
-                        new_lines.append("-- Plaidverse™ Bonus --")
-                        for g in plaid_chosen:
-                            new_lines.append(f"{idx2}. {g}")
-                            idx2 += 1
-    
-                    new_lines.append(f"{idx2}. Wild Card")
-                    new_lines.append(f"{idx2 + 1}. Reshuffle")
-    
-                    reshuf_prompt = (
-                        f"🔄 Genres reshuffled! Pick again:\n{chr(10).join(new_lines)}"
-                    )
-                    add_message("assistant", quip_speak(active_quip, "remix", reshuf_prompt))
+                    L.pop("reshuffled_genres", None)       # force regeneration
+                    L["genre_prompt_shown"] = False        # force prompt again
+                    add_message("assistant", quip_speak(active_quip, "remix", "🔄 Genres reshuffled!"))
                     st.session_state.GLOBAL["CURRENT_STEP"] = 2
                     st.rerun()
     
                 else:
-                    # Normal selection from the shown list
                     L["GENRE_SELECTED"] = sel
                     add_message("assistant", f"✅ Selected Genre: {sel}")
                     st.session_state.GLOBAL["CURRENT_STEP"] = 3
     
-            # Case 2: text input (direct genre name)
+            # --- Case 2: text input (wild card / reshuffle or partial match) ---
             elif choice:
-                normalized = choice.lower()
-                master = [g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE]
-                matches = [g for g in master if g.lower() == normalized]
-                if matches:
-                    selected_genre = matches[0]
-                    L["GENRE_SELECTED"] = selected_genre
-                    add_message("assistant", f"✅ Selected Genre: {selected_genre}")
+                if choice in {"wild", "wildcard", "wild card"}:
+                    master = [g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE]
+                    sel = random.choice(master) if master else "Surprise"
+                    L["GENRE_SELECTED"] = sel
+                    add_message("assistant", f"🎲 Wild Card genre → {sel}")
                     st.session_state.GLOBAL["CURRENT_STEP"] = 3
+    
+                elif choice in {"reshuffle", "shuffle"}:
+                    L.pop("reshuffled_genres", None)
+                    L["genre_prompt_shown"] = False
+                    add_message("assistant", quip_speak(active_quip, "remix", "🔄 Genres reshuffled!"))
+                    st.session_state.GLOBAL["CURRENT_STEP"] = 2
+                    st.rerun()
+    
                 else:
-                    add_message("assistant",
-                        quip_speak(active_quip, "prompt", f"❌ '{choice}' not recognized. Enter a number or exact genre name.")
-                    )
+                    # Partial match
+                    master = [g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE]
+                    match = next((g for g in master if choice in g.lower()), None)
+                    if match:
+                        L["GENRE_SELECTED"] = match
+                        add_message("assistant", f"✅ Selected Genre: {match}")
+                        st.session_state.GLOBAL["CURRENT_STEP"] = 3
+                    else:
+                        add_message("assistant", quip_speak(active_quip, "prompt",
+                            f"❌ '{choice}' not recognized. Enter a number, genre name, 'wild card', or 'reshuffle'."
+                        ))
     
             st.rerun()
 
-
-
-
-    # --- STEP 3: Absurdity selection ---]
-    elif step == 3:
+    # Ensure LIBATE + GLOBAL exist
+    if "LIBATE" not in st.session_state:
+        st.session_state["LIBATE"] = {}
+    if "GLOBAL" not in st.session_state:
+        st.session_state["GLOBAL"] = {"CURRENT_STEP": 1}
+    
+    L = st.session_state["LIBATE"]
+    S = st.session_state["GLOBAL"]
+    
+    
+    if step == 3:
         prompt = (
             f"Excellent! A {L.get('STYLE_SELECTED','')} {L.get('GENRE_SELECTED','')} story with {active_quip}.\n\n"
             "Finally, set the absurdity level:\n"
@@ -1272,107 +1362,221 @@ if mode == "Lib-Ate":
             "3. Plaidemonium™ - Laws of logic need not apply\n"
             "4. Wild Card - Let fate decide!"
         )
+    
         if not any("absurdity" in m.lower() for _, m in chat):
-            add_message("assistant",
-                quip_speak(active_quip, "prompt", prompt)
-            )
+            add_message("assistant", quip_speak(active_quip, "prompt", prompt))
             st.rerun()
     
-        v = st.text_input("Your choice (1-4)", key="libate_abs_pick")
-        if st.button("Submit absurdity"):
+        v = st.text_input("Your choice (1-4 or text)", key="libate_abs_pick")
+    
+        if st.button("Submit absurdity", key="btn_absurdity"):
             add_message("user", v)
-            m = {"1": "Mild", "2": "Moderate", "3": "Plaidemonium™", "4": "Wild Card"}
-            c = v.strip()
-            if c in m:
-                sel = m[c]
+            c = (v or "").strip().lower()
+    
+            num_map = {"1": "Mild", "2": "Moderate", "3": "Plaidemonium™", "4": "Wild Card"}
+            sel = None
+            if c in num_map:
+                sel = num_map[c]
                 if sel == "Wild Card":
                     sel = random.choice(["Mild", "Moderate", "Plaidemonium™"])
+            else:
+                if "mild" in c:
+                    sel = "Mild"
+                elif "moderate" in c:
+                    sel = "Moderate"
+                elif "plaid" in c:
+                    sel = "Plaidemonium™"
+                elif "wild" in c:
+                    sel = random.choice(["Mild", "Moderate", "Plaidemonium™"])
+    
+            if sel:
                 L["ABSURDITY_SELECTED"] = sel
                 add_message("assistant", f"✅ Absurdity set to: {sel}")
     
-                # Initialize word collection state
+                # reset prompt collection state
                 L["PROMPTS_COLLECTED"] = 0
                 L["COLLECTED"] = {}
-                L["PROMPTS_NEEDED"] = 12
                 L["VARS"] = {}
-                L["last_prompt_idx"] = None   # ✅ reset tracker
+                L["last_prompt_idx"] = -1
+                L.pop("PROMPTS_SESSION", None)
+                L.pop("PROMPTS_NEEDED", None)
     
-                # ✅ Go directly to Step 4 (don’t add Prompt 1 here)
+                # single mapping: style -> (min_prompts, max_prompts) following your guide
+                STYLE_PROMPT_COUNTS = {
+                    "ballads": (18, 24),
+                    "limericks": (8, 10),
+                    "open-form / performance poetry": (12, 15),
+                    "flash fiction": (12, 15),
+                    "microfiction": (8, 10),
+                    "fables": (18, 24),
+                    "vignettes": (18, 24),
+                    "satire & light parody": (18, 24),
+                    "breaking news": (12, 15),
+                    "greeting card writing": (8, 10),
+                    "scriptlets": (12, 15),
+                    "absurd how-to guides": (12, 15),
+                    "listicles": (12, 15),
+                    "text & email wars": (8, 10),
+                    "horror": (18, 24),
+                    "default": (18, 24),
+                }
+    
+                # helper to derive canonical style name from selection like "Limericks - Five-line ..."
+                raw_style = (L.get("STYLE_SELECTED") or "").strip()
+                canonical_style = raw_style.split(" - ")[0].strip().lower() if raw_style else "default"
+    
+                # pick min/max from mapping (falls back to default)
+                min_p, max_p = STYLE_PROMPT_COUNTS.get(canonical_style, STYLE_PROMPT_COUNTS["default"])
+                needed_count = random.randint(min_p, max_p)
+    
+                # map range -> human size label (for display)
+                SIZE_BY_RANGE = {
+                    (8, 10): "Tiny",
+                    (12, 15): "Short",
+                    (18, 24): "Standard",
+                    (25, 30): "Longform",
+                }
+                story_size_label = SIZE_BY_RANGE.get((min_p, max_p), "Standard")
+    
+                # persist chosen values
+                L["PROMPTS_NEEDED"] = needed_count
+                S["story_size"] = story_size_label
+                S["ABSURDITY_SELECTED"] = sel
+    
+                # user-facing confirmation (chat)
+                add_message(
+                    "assistant",
+                    f"📏 Story style **{raw_style or 'Unknown'}** → Size **{story_size_label}** → "
+                    f"Collecting **{needed_count} prompts**."
+                )
+    
+                # console debug
+                print(f"[DEBUG] style_raw={raw_style!r}, canonical={canonical_style!r}, range=({min_p},{max_p}), selected={needed_count}")
+    
+                st.session_state["GLOBAL"] = S
+                st.session_state["LIBATE"] = L
                 st.session_state.GLOBAL["CURRENT_STEP"] = 4
                 st.rerun()
-            else:
-                add_message("assistant",
-                    quip_speak(active_quip, "prompt", "❌ Please enter 1-4.")
-                )
-
-    # --- STEP 4: Word collection ---
+    
+    
+    # -----------------------------
+    # STEP 4: Word collection
+    # -----------------------------
     elif step == 4:
-        prompts = [
-            ("name", "Name (proper noun)", "Think protagonist: e.g., ‘Rowan’"),
-            ("profession", "Profession (noun)", "Detective, baker, cartographer…"),
-            ("place", "Place (noun)", "City, valley, ship, café…"),
-            ("adjective", "Adjective", "Moody, iridescent, stubborn…"),
-            ("object", "Object (noun)", "Lantern, violin, ledger…"),
-            ("name2", "Second character name", "Rival or ally"),
-            ("object2", "Second object (noun)", "Key, coin, compass…"),
-            ("place2", "Second place (noun)", "Square, market, jetty…"),
-            ("portal", "Portal/threshold (noun)", "Doorway, ripple, curtain…"),
-            ("tool", "Tool/aid (abstract ok)", "Courage, compass, trick…"),
-            ("trait", "Virtue/trait", "Grace, grit, candor…"),
-            ("wild", "Wildcard word/phrase", "Anything at all"),
+        # ensure state present
+        if "LIBATE" not in st.session_state:
+            st.session_state["LIBATE"] = {}
+        if "GLOBAL" not in st.session_state:
+            st.session_state["GLOBAL"] = {}
+    
+        L = st.session_state["LIBATE"]
+        S = st.session_state["GLOBAL"]
+    
+        MASTER_PROMPTS = [
+            ("Character Name", "Noun", "A sidekick who smells faintly of pickles"),
+            ("Whimsical Being", "Noun", "A magical creature who causes mild inconvenience"),
+            ("Villain", "Noun", "Someone whose evil plan involves soup spoons"),
+            ("Hero", "Noun", "A brave soul terrified of butterflies"),
+            ("Animal", "Noun", "Any critter with questionable fashion sense"),
+            ("Mythic Figure", "Noun", "A forgotten god of slightly damp laundry"),
+            ("Object", "Noun", "Something you'd keep under your hat if you were sneaky"),
+            ("Mystical Object", "Noun", "An enchanted toothbrush of destiny"),
+            ("Food", "Noun", "Something you'd eat at a picnic on a floating island"),
+            ("Treasure", "Noun", "A shiny object worth less than you think"),
+            ("Tool", "Noun", "A device that works only when nobody’s watching"),
+            ("Weapon", "Noun", "A sword made of stale baguettes"),
+            ("Gadget", "Noun", "A machine with too many buttons and no purpose"),
+            ("Verb", "Verb", "An action you might regret during a tea party"),
+            ("Odd Verb", "Verb", "Something you’d do when no one is looking"),
+            ("Silly Motion", "Verb", "A dance move that frightens pigeons"),
+            ("Heroic Act", "Verb", "Something shouted dramatically but done clumsily"),
+            ("Villainous Act", "Verb", "An act of evil involving balloons"),
+            ("Adjective", "Adjective", "How a haunted marionette might feel on Mondays"),
+            ("Mood", "Adjective", "The vibe of a talking lamp at midnight"),
+            ("Texture", "Adjective", "The way stale marshmallows feel in your hands"),
+            ("Color", "Adjective", "The shade of regret in a melted popsicle"),
+            ("Size", "Adjective", "The scale of ambition for a goldfish"),
+            ("Silly Sound", "Interjection", "A noise that confuses ducks but impresses robots"),
+            ("Exclamation", "Interjection", "Something you’d shout after inventing a reversible hammock"),
+            ("Battle Cry", "Interjection", "A shout that’s more sneeze than roar"),
+            ("Lullaby Word", "Interjection", "A soothing nonsense word"),
+            ("Laugh", "Interjection", "A cackle stolen from a gremlin"),
+            ("Place", "Noun (Place)", "A location where secrets are traded for cheese"),
+            ("Magical Place", "Noun (Place)", "A forest that whispers about socks"),
+            ("Workplace", "Noun (Place)", "An office run entirely by parrots"),
+            ("Dangerous Place", "Noun (Place)", "A canyon filled with giant rubber ducks"),
+            ("Safe Haven", "Noun (Place)", "A pillow fort with questionable Wi-Fi"),
+            ("Emotion", "Noun", "What raccoons feel when the trash can is locked"),
+            ("Secret Emotion", "Noun", "How you feel when ice cream falls"),
+            ("Villain Mood", "Noun", "The satisfaction of tying shoelaces too tight"),
+            ("Hero Mood", "Noun", "The joy of finally opening a pickle jar"),
+            ("Odd Feeling", "Noun", "A sensation like déjà vu but stickier"),
+            ("Weather", "Noun", "Rain that falls sideways out of spite"),
+            ("Time", "Noun", "A moment when clocks all sneeze at once"),
+            ("Transport", "Noun", "A vehicle powered by polite arguments"),
+            ("Magic Spell", "Verb/Noun", "A chant that only works on Tuesdays"),
+            ("Curse", "Phrase", "An insult involving soup and destiny"),
         ]
     
-        # initialize state if missing
-        if "PROMPTS_SESSION" not in L:
-            L["PROMPTS_SESSION"] = random.sample(prompts, 8)  # 🎲 pick 8 unique prompts
-            L["PROMPTS_NEEDED"] = len(L["PROMPTS_SESSION"])
+        # use the count chosen in Step 3 (self-heal if missing)
+        needed_count = L.get("PROMPTS_NEEDED")
+        if not needed_count:
+            # recompute from style as a safety net (same mapping as above)
+            raw_style = (L.get("STYLE_SELECTED") or "").strip()
+            canonical_style = raw_style.split(" - ")[0].strip().lower() if raw_style else "default"
+            STYLE_PROMPT_COUNTS = {
+                "ballads": (18, 24), "limericks": (8, 10), "open-form / performance poetry": (12, 15),
+                "flash fiction": (12, 15), "microfiction": (8, 10), "fables": (18, 24), "vignettes": (18, 24),
+                "satire & light parody": (18, 24), "breaking news": (12, 15), "greeting card writing": (8, 10),
+                "scriptlets": (12, 15), "absurd how-to guides": (12, 15), "listicles": (12, 15),
+                "text & email wars": (8, 10), "horror": (18, 24), "default": (18, 24),
+            }
+            min_p, max_p = STYLE_PROMPT_COUNTS.get(canonical_style, STYLE_PROMPT_COUNTS["default"])
+            needed_count = random.randint(min_p, max_p)
+            L["PROMPTS_NEEDED"] = needed_count
+    
+        needed_count = min(needed_count, len(MASTER_PROMPTS))
+        L["PROMPTS_NEEDED"] = needed_count
+    
+        # initialize session prompts once
+        if "PROMPTS_SESSION" not in L or len(L.get("PROMPTS_SESSION", [])) != needed_count:
+            L["PROMPTS_SESSION"] = random.sample(MASTER_PROMPTS, needed_count)
             L["PROMPTS_COLLECTED"] = 0
             L["COLLECTED"] = {}
             L["VARS"] = {}
+            L["last_prompt_idx"] = -1
+            st.session_state["LIBATE"] = L
     
         idx = L.get("PROMPTS_COLLECTED", 0)
         session_prompts = L["PROMPTS_SESSION"]
     
-        # ✅ If all prompts collected → move on
+        # done?
         if idx >= L["PROMPTS_NEEDED"]:
-            st.session_state.GLOBAL["CURRENT_STEP"] = 5
+            S["CURRENT_STEP"] = 5
+            st.session_state["GLOBAL"] = S
             st.rerun()
     
         key_name, title, helptext = session_prompts[idx]
     
-        # ✅ Only add assistant message once per new idx
-        if L.get("last_prompt_idx") != idx:
+        if L["last_prompt_idx"] != idx:
             msg = (
                 f"Prompt {idx+1} of {L['PROMPTS_NEEDED']}:\n\n"
                 f"**{title}**\n{helptext}\n\n"
                 f"{macquip_aside('If you draw a blank, type “surprise me”.', 'Lib-Ate')}\n\n"
                 "Your answer (or type \"surprise me\"):"
             )
-            add_message("assistant", msg)
+            add_message(active_quip, quip_speak(active_quip, "prompt", msg))
             L["last_prompt_idx"] = idx
+            st.session_state["LIBATE"] = L
             st.rerun()
     
-        # One input per prompt index
         v = st.text_input("Answer", key=f"libate_word_input_{idx}")
         if st.button("Submit answer", key=f"libate_submit_{idx}"):
-            ans = v.strip()
+            ans = (v or "").strip()
             add_message("user", ans if ans else "surprise me")
     
             if not ans or ans.lower() == "surprise me":
-                auto = random.choice([
-                    "Rowan","Harper","Alex","Miri","Sable","Juno","Isla","Orion",
-                    "astronomer","baker","tinkerer","ranger","scribe",
-                    "Dockside","Northbridge","Glimmerfall","Moonmarket",
-                    "tattered","luminous","sardonic","restless",
-                    "compass","ledger","lantern","accordion","vending machine",
-                    "Riley","Kestrel","Nico","Vee",
-                    "map","coin","hourglass","key",
-                    "Rookery","East Gate","Sun Stairs","Old Yard",
-                    "ripple","threshold","curtain","vellum",
-                    "courage","wit","stubbornness","luck",
-                    "grace","grit","candor","pluck",
-                    "confetti rain","time hiccup","snack-based destiny",
-                ])
+                auto = ai_surprise(title, helptext)
                 L["COLLECTED"][key_name] = auto
                 L["VARS"][key_name] = auto
                 add_message(active_quip, f'🎲 Surprise pick: "{auto}"')
@@ -1380,11 +1584,9 @@ if mode == "Lib-Ate":
                 L["COLLECTED"][key_name] = ans
                 L["VARS"][key_name] = ans
     
-            # ✅ advance to next prompt
             L["PROMPTS_COLLECTED"] = idx + 1
-            st.session_state.GLOBAL["CURRENT_STEP"] = 4
+            st.session_state["LIBATE"] = L
             st.rerun()
-
 
 
 
@@ -1403,19 +1605,52 @@ if mode == "Lib-Ate":
                 )
             )
             st.rerun()
-    
+            
         conf = st.text_input("Type Yes to Generate, No to restart", key="confirm_input")
         if st.button("Submit confirmation"):
             add_message("user", conf)
-            if conf.strip().lower() in {"yes", "generate"}:
+            c = conf.strip().lower()
+        
+            # --- Normal generate flow ---
+            if c in {"yes", "generate"}:
                 st.session_state.GLOBAL["CURRENT_STEP"] = 6
                 st.rerun()
-            else:
+        
+            # --- Restart request ---
+            elif c in {"restart", "reset", "no"}:
+                # Ask for explicit confirmation
                 add_message("assistant",
-                    quip_speak(active_quip, "remix", "🔄 Restarting setup...")
+                    quip_speak(active_quip, "remix", "⚠️ Do you really want to restart? Type **yes** to confirm or **cancel** to stay.")
                 )
-                st.session_state.GLOBAL["CURRENT_STEP"] = 1
+                st.session_state["awaiting_restart_confirm"] = True
                 st.rerun()
+        
+            # --- Handle restart confirmation ---
+            elif st.session_state.get("awaiting_restart_confirm"):
+                if c == "yes":
+                    add_message("assistant",
+                        quip_speak(active_quip, "remix", "🔄 Restarting setup...")
+                    )
+                    st.session_state.pop("awaiting_restart_confirm", None)
+                    st.session_state.GLOBAL["CURRENT_STEP"] = 1
+                    st.rerun()
+                elif c == "cancel":
+                    add_message("assistant", "❌ Restart canceled. Continuing where we left off.")
+                    st.session_state.pop("awaiting_restart_confirm", None)
+                    # stay on same step
+                    st.session_state.GLOBAL["CURRENT_STEP"] = 5
+                    st.rerun()
+                else:
+                    add_message("assistant", "⚠️ Invalid input. Type **yes** to restart or **cancel** to stay.")
+                    st.session_state.GLOBAL["CURRENT_STEP"] = 5
+                    st.rerun()
+        
+            # --- Invalid input ---
+            else:
+                add_message("assistant", "❌ Invalid choice. Please type **yes** to generate, **no/restart** to restart.")
+                st.session_state.GLOBAL["CURRENT_STEP"] = 5
+                st.rerun()
+        
 
 
     # =========================
@@ -1567,6 +1802,7 @@ if mode == "Lib-Ate":
                 if st.button("⬅️ Back to Post-Story Menu"):
                     st.session_state.pop("plaidmag_mode", None)
                     st.session_state.pop("plaidmag_format", None)
+                    st.session_state.pop("generated_image", None)
                     st.rerun()
     
         # --- Normal Post-story menu ---
@@ -1670,61 +1906,60 @@ elif mode == "Create Direct":
         menu = "\n".join([f"{i+1}. {n} - {d}" for i,(n,d) in enumerate(styles)])
     
         if not any("Choose the literary style" in m for _, m in chat):
-            add_message("assistant",
+            add_message(
+                "assistant",
                 f"✍️ Welcome to Create Direct™!\n\nChoose the literary style:\n{menu}\n"
                 "6. Wild Card - Surprise style!\n7. Reshuffle - Different options\n\n"
-                "👉 You can type either the number or part of the style name."
+                "👉 You can type either the number, the name, or part of the name."
             )
             st.rerun()
     
-        v = st.text_input("Your choice (1-7 or partial style name)", key="cd_style_pick")
+        v = st.text_input("Your choice (1–7 or style name)", key="cd_style_pick")
         if st.button("Submit style"):
             add_message("user", v)
             c = v.strip().lower()
     
-            # Handle reshuffle
-            if c == "7":
+            # --- Handle reshuffle (by number or text) ---
+            if c == "7" or c in {"reshuffle", "shuffle"}:
                 C["STYLE_OPTIONS"] = pick_random_styles()
                 styles = C["STYLE_OPTIONS"]
-                new_menu = "\n".join([f"{i+1}. {n} - {d}" for i,(n,d) in enumerate(styles)])
-    
+                new_menu = "\n".join([f"{i+1}. {n} - {d}" for i, (n, d) in enumerate(styles)])
                 reshuf_prompt = (
                     f"🔄 Styles reshuffled! Choose again:\n{new_menu}\n"
                     "6. Wild Card - Surprise style!\n7. Reshuffle - Different options\n\n"
-                    "👉 You can type either the number or part of the style name."
+                    "👉 You can type either the number, the name, or part of the name."
                 )
                 add_message("assistant", reshuf_prompt)
                 st.session_state.GLOBAL["CURRENT_STEP"] = 1
                 st.rerun()
     
-            # Handle wild card
-            elif c == "6":
+            # --- Handle wild card (by number or text) ---
+            elif c == "6" or c in {"wild", "wildcard", "wild card"}:
                 C["STYLE_SELECTED"] = random.choice([s[0] for s in styles])
                 add_message("assistant", f"🎲 Wild Card pick: {C['STYLE_SELECTED']}")
                 st.session_state.GLOBAL["CURRENT_STEP"] = 2
                 st.rerun()
     
-            # Handle numbered styles
-            elif c in {"1","2","3","4","5"}:
-                C["STYLE_SELECTED"] = styles[int(c)-1][0]
+            # --- Handle numbered styles ---
+            elif c in {"1", "2", "3", "4", "5"}:
+                C["STYLE_SELECTED"] = styles[int(c) - 1][0]
                 add_message("assistant", f"✅ Selected Style: {C['STYLE_SELECTED']}")
                 st.session_state.GLOBAL["CURRENT_STEP"] = 2
                 st.rerun()
     
             else:
-                # Try partial match
-                match = next(
-                    (s[0] for s in styles if c in s[0].lower()), None
-                )
+                # --- Handle partial style name ---
+                match = next((s[0] for s in styles if c in s[0].lower()), None)
                 if match:
                     C["STYLE_SELECTED"] = match
                     add_message("assistant", f"✅ Selected Style: {C['STYLE_SELECTED']}")
                     st.session_state.GLOBAL["CURRENT_STEP"] = 2
                     st.rerun()
                 else:
-                    add_message("assistant", "❌ Invalid choice. Please enter 1–7 or part of a style name.")
+                    add_message("assistant", "❌ Invalid choice. Please enter 1–7, a style name, or part of one.")
                     st.session_state.GLOBAL["CURRENT_STEP"] = 1
                     st.rerun()
+
 
 
 
@@ -1734,7 +1969,7 @@ elif mode == "Create Direct":
         # ----------------------------
     # STEP 2: Genre Selection
     # ----------------------------
-    if step == 2:
+    elif step == 2:
         # Build structured genre options once
         if "GENRE_OPTIONS" not in C:
             core_names = [g for g in CORE_GENRES]
@@ -1745,7 +1980,6 @@ elif mode == "Create Direct":
             flex_chosen = random.sample(flex_names, min(2, len(flex_names))) if flex_names else []
             plaid_chosen = random.sample(plaid_names, min(1, len(plaid_names))) if plaid_names else []
     
-            # Flatten into one list with (name, desc) pairs
             C["GENRE_OPTIONS"] = core_chosen + flex_chosen + plaid_chosen
     
         genres = C["GENRE_OPTIONS"]
@@ -1787,19 +2021,21 @@ elif mode == "Create Direct":
         menu = "\n".join(lines)
     
         if not any("Pick your genre" in m for _, m in chat):
-            add_message("assistant",
+            add_message(
+                "assistant",
                 f"📚 {active_quip}: Pick your genre:\n{menu}\n\n"
-                "👉 You can type either the number or part of the genre name."
+                "👉 You can type the number, the genre name, or just part of it. "
+                "Also works with 'wild card' or 'reshuffle'."
             )
             st.rerun()
     
-        v = st.text_input(f"Your choice (1-{reshuf_idx} or genre name)", key="cd_genre_pick")
+        v = st.text_input(f"Your choice (1–{reshuf_idx} or genre name)", key="cd_genre_pick")
         if st.button("Submit genre"):
             add_message("user", v)
             c = v.strip().lower()
     
-            # Handle reshuffle
-            if c == str(reshuf_idx):
+            # --- Handle reshuffle (number or text) ---
+            if c == str(reshuf_idx) or c in {"reshuffle", "shuffle"}:
                 core_names = [g for g in CORE_GENRES]
                 flex_names = [g for g in FLEX_GENRES]
                 plaid_names = [g for g in PLAIDVERSE]
@@ -1809,8 +2045,6 @@ elif mode == "Create Direct":
                 plaid_chosen = random.sample(plaid_names, min(1, len(plaid_names))) if plaid_names else []
     
                 C["GENRE_OPTIONS"] = core_chosen + flex_chosen + plaid_chosen
-                genres = C["GENRE_OPTIONS"]
-    
                 new_lines = []
                 idx2 = 1
                 if core_chosen:
@@ -1840,15 +2074,15 @@ elif mode == "Create Direct":
                 st.session_state.GLOBAL["CURRENT_STEP"] = 2
                 st.rerun()
     
-            # Handle wild card
-            elif c == str(wild_idx):
+            # --- Handle wild card (number or text) ---
+            elif c == str(wild_idx) or c in {"wild", "wildcard", "wild card"}:
                 master = [g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE]
                 C["GENRE_SELECTED"] = random.choice(master) if master else "Surprise"
                 add_message("assistant", f"🎲 {active_quip}: Wild Card pick → {C['GENRE_SELECTED']}")
                 st.session_state.GLOBAL["CURRENT_STEP"] = 3
                 st.rerun()
     
-            # Handle numbered genres
+            # --- Handle numbered genres ---
             elif c.isdigit() and 1 <= int(c) <= len(genres):
                 C["GENRE_SELECTED"] = genres[int(c)-1][0]
                 add_message("assistant", f"✅ {active_quip}: Selected Genre → {C['GENRE_SELECTED']}")
@@ -1856,19 +2090,21 @@ elif mode == "Create Direct":
                 st.rerun()
     
             else:
-                # Partial text match
-                match = next(
-                    (n for n, _ in genres if c in n.lower()), None
-                )
+                # --- Handle partial match ---
+                match = next((n for n, _ in genres if c in n.lower()), None)
                 if match:
                     C["GENRE_SELECTED"] = match
                     add_message("assistant", f"✅ {active_quip}: Selected Genre → {C['GENRE_SELECTED']}")
                     st.session_state.GLOBAL["CURRENT_STEP"] = 3
                     st.rerun()
                 else:
-                    add_message("assistant", "❌ Invalid choice. Please enter a number or part of a listed genre name.")
+                    add_message(
+                        "assistant",
+                        "❌ Invalid choice. Please enter a number, a genre name, or type 'wild card' / 'reshuffle'."
+                    )
                     st.session_state.GLOBAL["CURRENT_STEP"] = 2
                     st.rerun()
+
 
 
 
@@ -1880,31 +2116,65 @@ elif mode == "Create Direct":
     # ----------------------------
     elif step == 3:
         if not any("chaos level" in m for _, m in chat):
-            add_message("assistant",
+            add_message(
+                "assistant",
                 f"🎭 {active_quip}: Excellent! A {C['STYLE_SELECTED']} {C['GENRE_SELECTED']} adventure is brewing.\n\n"
                 "Now, set the chaos level:\n"
                 "1. Mild – Just a sprinkle of silly\n"
                 "2. Moderate – Comfortably ridiculous\n"
                 "3. Plaidemonium™ – Laws of logic need not apply\n"
-                "4. Wild Card – Let fate decide!\n(Type 1–4)"
+                "4. Wild Card – Let fate decide!\n"
+                "👉 Type **1–4** or the chaos level name."
             )
             st.rerun()
-
-        v = st.text_input("Your choice (1-4)", key="cd_abs_pick")
+    
+        v = st.text_input("Your choice (1–4 or chaos name)", key="cd_abs_pick")
         if st.button("Submit absurdity"):
             add_message("user", v)
             c = v.strip()
-            mapping = {"1":"Mild","2":"Moderate","3":"Plaidemonium™","4":"Wild Card"}
-            if c in mapping:
-                sel = mapping[c]
+    
+            # Number mapping
+            num_map = {"1": "Mild", "2": "Moderate", "3": "Plaidemonium™", "4": "Wild Card"}
+            # Canonical chaos options
+            chaos_options = ["Mild", "Moderate", "Plaidemonium™", "Wild Card"]
+    
+            sel = None
+            # Case 1: number
+            if c in num_map:
+                sel = num_map[c]
+            else:
+                # Normalize input
+                c_lower = c.lower()
+                # Case 2: exact text match
+                for opt in chaos_options:
+                    if c_lower == opt.lower() or c_lower == opt.lower().replace("™", ""):
+                        sel = opt
+                        break
+                # Case 3: partial match
+                if not sel:
+                    matches = [opt for opt in chaos_options if c_lower in opt.lower()]
+                    if len(matches) == 1:
+                        sel = matches[0]
+    
+            if sel:
                 if sel == "Wild Card":
-                    sel = random.choice(["Mild","Moderate","Plaidemonium™"])
+                    sel = random.choice(["Mild", "Moderate", "Plaidemonium™"])
+                    add_message("assistant", f"🎲 {active_quip}: Wild Card chaos → {sel}")
+                else:
+                    add_message("assistant", f"✅ {active_quip}: Chaos level set to → {sel}")
+    
                 C["ABSURDITY_SELECTED"] = sel
-                add_message("assistant", f"✅ {active_quip}: Chaos level set to → {sel}")
                 st.session_state.GLOBAL["CURRENT_STEP"] = 4
                 st.rerun()
             else:
-                add_message("assistant", f"❌ {active_quip}: Please pick between 1–4.")
+                add_message(
+                    "assistant",
+                    f"❌ {active_quip}: I didn’t understand '{c}'. Please pick 1–4 or type a chaos level name (even partially)."
+                )
+
+
+
+
 
 
         # ----------------------------
@@ -2154,8 +2424,8 @@ elif mode == "Storyline":
     # ---------- single chat input ----------
     placeholder = {
         1: "Your concept…",
-        2: "Pick 1–7…",
-        3: "Pick 1–4…",
+        2: "Pick 1–7 or Type Name",
+        3: "Pick 1–4 or Type Name",
         4: "Type generate…",
         5: "Pick 1–6…",
     }.get(step, "Type here…")
@@ -2194,55 +2464,82 @@ elif mode == "Storyline":
         c = user_msg.strip().lower()
         styles = S["STYLE_OPTIONS"]
     
-        # Handle reshuffle
-        if c == "7":
+        # --- Handle reshuffle (number or text) ---
+        if c == "7" or c in {"reshuffle", "shuffle"}:
             S.pop("STYLE_OPTIONS", None)
             S["emitted"].discard("style_prompt")
             say("assistant", "🔄 Reshuffling styles…")
+            G["CURRENT_STEP"] = 2
     
-        # Handle wild card
-        elif c == "6":
+        # --- Handle wild card (number or text) ---
+        elif c == "6" or c in {"wild", "wildcard", "wild card"}:
             S["STYLE_SELECTED"] = random.choice([s[0] for s in styles])
             say("assistant", f"🎨 Style chosen: **{S['STYLE_SELECTED']}**")
             G["CURRENT_STEP"] = 3
     
-        # Handle numbered styles
+        # --- Handle numbered styles ---
         elif c.isdigit() and 1 <= int(c) <= len(styles):
             S["STYLE_SELECTED"] = styles[int(c)-1][0]
             say("assistant", f"🎨 Style chosen: **{S['STYLE_SELECTED']}**")
             G["CURRENT_STEP"] = 3
     
         else:
-            # Partial text match
-            match = next(
-                (n for n, _ in styles if c in n.lower()), None
-            )
+            # --- Handle partial text match ---
+            match = next((n for n, _ in styles if c in n.lower()), None)
             if match:
                 S["STYLE_SELECTED"] = match
                 say("assistant", f"🎨 Style chosen: **{S['STYLE_SELECTED']}**")
                 G["CURRENT_STEP"] = 3
             else:
-                say("assistant", "❌ Invalid choice. Please enter a number or part of a style name.")
+                say("assistant", "❌ Invalid choice. Please enter a number, part of a style name, 'wild card', or 'reshuffle'.")
                 G["CURRENT_STEP"] = 2
     
         st.rerun()
 
 
 
+
     # ---------- Step 3: Absurdity ----------
     elif step == 3:
         mapping = {"1": "Mild", "2": "Moderate", "3": "Plaidemonium™", "4": "Wild Card"}
-        c = user_msg.strip()
+        options = ["Mild", "Moderate", "Plaidemonium™", "Wild Card"]
+    
+        c = user_msg.strip().lower()
+        sel = None
+    
+        # --- Case 1: numeric ---
         if c in mapping:
             sel = mapping[c]
+    
+        # --- Case 2: exact text match (case-insensitive) ---
+        elif c in {opt.lower().replace("™", "") for opt in options}:
+            for opt in options:
+                if c == opt.lower() or c == opt.lower().replace("™", ""):
+                    sel = opt
+                    break
+    
+        # --- Case 3: partial text match ---
+        else:
+            matches = [opt for opt in options if c in opt.lower()]
+            if len(matches) == 1:
+                sel = matches[0]
+    
+        # --- Handle Wild Card ---
+        if sel:
             if sel == "Wild Card":
                 sel = random.choice(["Mild", "Moderate", "Plaidemonium™"])
+                say("assistant", f"🎲 Wild Card absurdity → **{sel}**")
+            else:
+                say("assistant", f"✅ Absurdity selected: **{sel}**")
+    
             S["ABSURDITY_SELECTED"] = sel
-            say("assistant", f"✅ Absurdity selected: **{sel}**")
             G["CURRENT_STEP"] = 4
+    
         else:
-            say("assistant", "❌ Please pick **1–4**.")
+            say("assistant", "❌ Please pick **1–4**, or type part of a chaos level name.")
+    
         st.rerun()
+
 
     # ---------- Step 4: Generate story ----------
     elif step == 4:
@@ -2461,12 +2758,14 @@ elif mode == "PlaidPic":
             f"🎨 Pick a literary style:\n{menu}\n6. Wild Card\n7. Reshuffle"
         )
     
-        v = st.text_input("Your choice (1–7)", key="pic_style_pick")
-        if st.button("Submit style"):
+        v = st.text_input("Your choice (1–7 or style name)", key="pic_style_pick")
+    
+        if st.button("Submit style", key="btn_style"):
             say("user", v)
-            c = v.strip()
-            if c == "7":
-                # Force reshuffle: assign new random styles
+            c = v.strip().lower()
+    
+            # Handle reshuffle
+            if c == "7" or "reshuffle" in c:
                 P["STYLE_OPTIONS"] = pick_random_styles(n=5)
                 new_styles = P["STYLE_OPTIONS"]
                 new_menu = "\n".join([f"{i+1}. {n} - {d}" for i, (n, d) in enumerate(new_styles)])
@@ -2474,20 +2773,36 @@ elif mode == "PlaidPic":
                 G["CURRENT_STEP"] = 2
                 st.rerun()
     
-            elif c == "6":
+            # Handle wild card
+            elif c == "6" or "wild" in c:
                 P["STYLE_SELECTED"] = random.choice([s[0] for s in styles])
                 say("assistant", f"🎲 Wild Card → {P['STYLE_SELECTED']}", quipify=True)
                 G["CURRENT_STEP"] = 3
                 st.rerun()
     
+            # Handle numeric selection
             elif c in {"1","2","3","4","5"}:
                 P["STYLE_SELECTED"] = styles[int(c)-1][0]
                 say("assistant", f"✅ Selected Style → {P['STYLE_SELECTED']}", quipify=True)
                 G["CURRENT_STEP"] = 3
                 st.rerun()
     
+            # Handle text input (partial match)
             else:
-                say("assistant", "❌ Pick 1–7.", quipify=True)
+                match = None
+                for (name, desc) in styles:
+                    if c in name.lower():   # ✅ partial substring match
+                        match = name
+                        break
+    
+                if match:
+                    P["STYLE_SELECTED"] = match
+                    say("assistant", f"✅ Selected Style → {P['STYLE_SELECTED']}", quipify=True)
+                    G["CURRENT_STEP"] = 3
+                    st.rerun()
+                else:
+                    say("assistant", "❌ Pick 1–7 or enter a valid style name.", quipify=True)
+
 
 
     # STEP 3 – Genre
@@ -2497,45 +2812,78 @@ elif mode == "PlaidPic":
             P["GENRE_MENU"], P["GENRE_MAPPING"] = menu, mapping
         else:
             menu, mapping = P["GENRE_MENU"], P["GENRE_MAPPING"]
-
-        emit_once("pic_genre", f"📚 Choose your genre:\n{menu}\n(Type 1–8)")
-
-        v = st.text_input("Your choice (1–8)", key="pic_genre_pick")
-        if st.button("Submit genre"):
+    
+        emit_once("pic_genre", f"📚 Choose your genre:\n{menu}\n(Type 1–8, name, or 'wild/reshuffle')")
+    
+        v = st.text_input("Your choice (1–8 or genre name)", key="pic_genre_pick")
+    
+        if st.button("Submit genre", key="btn_genre"):
             say("user", v)
-            c = v.strip()
-            if c == str(len(mapping)):  # Reshuffle
+            c = v.strip().lower()
+    
+            # Handle reshuffle
+            if c == str(len(mapping)) or "reshuffle" in c:
                 menu, mapping = genre_menu_block()
                 P["GENRE_MENU"], P["GENRE_MAPPING"] = menu, mapping
                 say("assistant", "🔄 Genres reshuffled!", quipify=True)
                 st.rerun()
+    
+            # Handle wild card
+            elif c in mapping and mapping[c] == "Wild Card":
+                gsel = random.choice([g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE])
+                P["GENRE_SELECTED"] = gsel
+                say("assistant", f"🎲 Wild Card → {gsel}", quipify=True)
+                G["CURRENT_STEP"] = 4
+                st.rerun()
+            elif "wild" in c:
+                gsel = random.choice([g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE])
+                P["GENRE_SELECTED"] = gsel
+                say("assistant", f"🎲 Wild Card → {gsel}", quipify=True)
+                G["CURRENT_STEP"] = 4
+                st.rerun()
+    
+            # Handle numeric selection
             elif c in mapping:
                 gsel = mapping[c]
-                if gsel == "Wild Card":
-                    gsel = random.choice([g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE])
                 P["GENRE_SELECTED"] = gsel
                 say("assistant", f"✅ Selected Genre → {gsel}", quipify=True)
                 G["CURRENT_STEP"] = 4
                 st.rerun()
+    
+            # Handle text input (partial match with genre names)
             else:
-                say("assistant", "❌ Invalid. Pick 1–8.", quipify=True)
+                all_genres = [g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE]
+                match = None
+                for g in all_genres:
+                    if c in g.lower():   # ✅ partial substring match
+                        match = g
+                        break
+    
+                if match:
+                    P["GENRE_SELECTED"] = match
+                    say("assistant", f"✅ Selected Genre → {match}", quipify=True)
+                    G["CURRENT_STEP"] = 4
+                    st.rerun()
+                else:
+                    say("assistant", "❌ Invalid. Pick 1–8, a genre name, or type 'wild/reshuffle'.", quipify=True)
+
 
     # STEP 4 – Absurdity
     elif step == 4:
-    # Show absurdity menu once
+        # Show absurdity menu once
         emit_once("pic_absurdity",
             "🎭 Set the absurdity:\n"
             "1. Mild\n"
             "2. Moderate\n"
             "3. Plaidemonium™\n"
             "4. Wild Card (1–4)\n\n"
-            "👉 You can type either the **number** or the **absurdity name**."
+            "👉 You can type either the **number**, the absurdity name, or part of it."
         )
     
         v = st.text_input("Your choice (1–4 or name)", key="pic_abs_pick")
         if st.button("Submit absurdity"):
             say("user", v)
-            choice = v.strip()
+            choice = v.strip().lower()
     
             mapping = {
                 "1": "Mild",
@@ -2546,29 +2894,35 @@ elif mode == "PlaidPic":
     
             sel = None
     
-            # Case 1: numeric input
+            # --- Case 1: numeric ---
             if choice in mapping:
                 sel = mapping[choice]
+    
+            # --- Case 2: text wild card ---
+            elif choice in {"wild", "wildcard", "wild card"}:
+                sel = "Wild Card"
+    
+            # --- Case 3: partial text match ---
+            else:
+                options = ["Mild", "Moderate", "Plaidemonium™"]
+                match = next((a for a in options if choice in a.lower()), None)
+                if match:
+                    sel = match
+    
+            # --- Handle result ---
+            if sel:
                 if sel == "Wild Card":
                     sel = random.choice(["Mild", "Moderate", "Plaidemonium™"])
+                    say("assistant", f"🎲 Wild Card absurdity → {sel}", quipify=True)
+                else:
+                    say("assistant", f"✅ Absurdity set → {sel}", quipify=True)
+    
                 P["ABSURDITY_SELECTED"] = sel
-                say("assistant", f"✅ Absurdity set → {sel}", quipify=True)
                 G["CURRENT_STEP"] = 5
                 st.rerun()
-    
-            # Case 2: text input (direct absurdity name)
             else:
-                normalized = choice.lower()
-                valid_options = ["Mild", "Moderate", "Plaidemonium™"]
-                match = next((a for a in valid_options if a.lower().startswith(normalized)), None)
-    
-                if match:
-                    P["ABSURDITY_SELECTED"] = match
-                    say("assistant", f"✅ Absurdity set → {match}", quipify=True)
-                    G["CURRENT_STEP"] = 5
-                    st.rerun()
-                else:
-                    say("assistant", "❌ Please pick 1–4 or type a valid absurdity.", quipify=True)
+                say("assistant", "❌ Please pick 1–4 or type a valid absurdity (full or partial).", quipify=True)
+
 
 
     # STEP 5 – Generate Story
@@ -2787,11 +3141,12 @@ elif mode == "PlaidMagGen":
         user_message(user_input)
     
         # --- Step 1: Format ---
-        # --- Step 1: Format ---
         if st.session_state.step == 1:
-            choice = user_input.strip()
+            choice = user_input.strip().lower()
+        
+            # Handle numeric choice
             if choice in format_map:
-                if choice == "5":  # Wild Card
+                if choice == "5":  # Wild Card by number
                     fmt = random.choice(list(format_map.values())[:-1])
                     st.session_state.answers["format"] = fmt
                     assistant_message(f"🎲 Wild Card format → {fmt}")
@@ -2800,7 +3155,6 @@ elif mode == "PlaidMagGen":
         
                 # Move to Step 2
                 st.session_state.step = 2
-                # Reset styles so fresh randoms appear
                 st.session_state.STYLE_OPTIONS = pick_random_styles(n=5)
                 styles = st.session_state.STYLE_OPTIONS
                 wild_idx = len(styles) + 1
@@ -2809,10 +3163,51 @@ elif mode == "PlaidMagGen":
                 style_lines.append(f"{wild_idx}. Wild Card")
                 style_lines.append(f"{reshuf_idx}. Reshuffle")
         
-                assistant_message("**STEP 2: Choose Style (type number or name)**\n" +
+                assistant_message("**STEP 2: Choose Style (type number, name, or keyword)**\n" +
                                   "\n".join(style_lines))
+        
+            # Handle wild keyword
+            elif "wild" in choice:
+                fmt = random.choice(list(format_map.values())[:-1])
+                st.session_state.answers["format"] = fmt
+                st.session_state.step = 2
+                assistant_message(f"🎲 Wild Card format → {fmt}")
+        
+                st.session_state.STYLE_OPTIONS = pick_random_styles(n=5)
+                styles = st.session_state.STYLE_OPTIONS
+                wild_idx = len(styles) + 1
+                reshuf_idx = len(styles) + 2
+                style_lines = [f"{i+1}. {name}" for i, (name, _) in enumerate(styles)]
+                style_lines.append(f"{wild_idx}. Wild Card")
+                style_lines.append(f"{reshuf_idx}. Reshuffle")
+                assistant_message("**STEP 2: Choose Style (type number, name, or keyword)**\n" +
+                                  "\n".join(style_lines))
+        
+            # Handle text input (partial match)
             else:
-                assistant_message("❌ Invalid input. Please type 1-5.")
+                match = None
+                for _, fmt_name in format_map.items():
+                    if choice in fmt_name.lower():
+                        match = fmt_name
+                        break
+        
+                if match:
+                    st.session_state.answers["format"] = match
+                    st.session_state.step = 2
+                    assistant_message(f"✅ Selected Format → {match}")
+        
+                    st.session_state.STYLE_OPTIONS = pick_random_styles(n=5)
+                    styles = st.session_state.STYLE_OPTIONS
+                    wild_idx = len(styles) + 1
+                    reshuf_idx = len(styles) + 2
+                    style_lines = [f"{i+1}. {name}" for i, (name, _) in enumerate(styles)]
+                    style_lines.append(f"{wild_idx}. Wild Card")
+                    style_lines.append(f"{reshuf_idx}. Reshuffle")
+                    assistant_message("**STEP 2: Choose Style (type number, name, or keyword)**\n" +
+                                      "\n".join(style_lines))
+                else:
+                    assistant_message("❌ Invalid input. Type 1–5, a format name (partial ok), or 'wild'.")
+
             
     
         # --- Step 2: Style (dynamic) ---
@@ -2820,25 +3215,25 @@ elif mode == "PlaidMagGen":
             # Initialize random styles if not already set
             if "STYLE_OPTIONS" not in st.session_state:
                 st.session_state.STYLE_OPTIONS = pick_random_styles(n=5)
-
+        
             styles = st.session_state.STYLE_OPTIONS
             wild_idx = len(styles) + 1
             reshuf_idx = len(styles) + 2
-
+        
             # Build dynamic style menu
             style_lines = [f"{i+1}. {name}" for i, (name, _) in enumerate(styles)]
             style_lines.append(f"{wild_idx}. Wild Card")
             style_lines.append(f"{reshuf_idx}. Reshuffle")
-
+        
             # Show menu once
             if not any(m["role"]=="assistant" and "STEP 2: Choose Style" in m["content"]
                        for m in st.session_state.chat_history):
-                assistant_message("**STEP 2: Choose Style (type number or name)**\n" +
+                assistant_message("**STEP 2: Choose Style (type number, name, or keyword)**\n" +
                                   "\n".join(style_lines))
-
-            choice = user_input.strip()
-
-            # Handle numeric choices
+        
+            choice = user_input.strip().lower()
+        
+            # Handle numeric input
             if choice.isdigit():
                 choice_num = int(choice)
                 if 1 <= choice_num <= len(styles):
@@ -2848,8 +3243,7 @@ elif mode == "PlaidMagGen":
                     assistant_message(f"✅ Selected Style → {sel}")
                     assistant_message(step_prompts[3])
                 elif choice_num == wild_idx:
-                    master = [s[0] for s in pick_random_styles(n=20)]
-                    sel = random.choice(master)
+                    sel = random.choice([s[0] for s in pick_random_styles(n=20)])
                     st.session_state.answers["style"] = sel
                     st.session_state.step = 3
                     assistant_message(f"🎲 Wild Card style → {sel}")
@@ -2861,21 +3255,40 @@ elif mode == "PlaidMagGen":
                     new_lines = [f"{i+1}. {n}" for i, (n, _) in enumerate(new_styles)]
                     new_lines.append(f"{len(new_styles)+1}. Wild Card")
                     new_lines.append(f"{len(new_styles)+2}. Reshuffle")
-                    assistant_message("🔄 Styles reshuffled! Pick again:\n" +
-                                      "\n".join(new_lines))
+                    assistant_message("🔄 Styles reshuffled! Pick again:\n" + "\n".join(new_lines))
                 else:
-                    assistant_message("❌ Invalid input. Please type a valid number.")
+                    assistant_message("❌ Invalid number. Pick from the menu.")
+        
+            # Handle wild/reshuffle keywords
+            elif "wild" in choice:
+                sel = random.choice([s[0] for s in pick_random_styles(n=20)])
+                st.session_state.answers["style"] = sel
+                st.session_state.step = 3
+                assistant_message(f"🎲 Wild Card style → {sel}")
+                assistant_message(step_prompts[3])
+            elif "reshuffle" in choice:
+                st.session_state.STYLE_OPTIONS = pick_random_styles(n=5)
+                new_styles = st.session_state.STYLE_OPTIONS
+                new_lines = [f"{i+1}. {n}" for i, (n, _) in enumerate(new_styles)]
+                new_lines.append(f"{len(new_styles)+1}. Wild Card")
+                new_lines.append(f"{len(new_styles)+2}. Reshuffle")
+                assistant_message("🔄 Styles reshuffled! Pick again:\n" + "\n".join(new_lines))
+        
+            # Handle text input (partial match)
             else:
-                # Handle text input (exact match)
-                matches = [s[0] for s in styles if s[0].lower() == choice.lower()]
-                if matches:
-                    sel = matches[0]
-                    st.session_state.answers["style"] = sel
+                match = None
+                for name, _ in styles:
+                    if choice in name.lower():   # ✅ partial match
+                        match = name
+                        break
+                if match:
+                    st.session_state.answers["style"] = match
                     st.session_state.step = 3
-                    assistant_message(f"✅ Selected Style → {sel}")
+                    assistant_message(f"✅ Selected Style → {match}")
                     assistant_message(step_prompts[3])
                 else:
-                    assistant_message("❌ Not recognized. Enter a valid number or exact style name.")
+                    assistant_message("❌ Not recognized. Please type a number, a style name (partial ok), or 'wild/reshuffle'.")
+
     
         # --- Step 3: Scene ---
         elif st.session_state.step == 3:
@@ -3397,75 +3810,6 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
