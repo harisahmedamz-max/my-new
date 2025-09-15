@@ -489,7 +489,12 @@ def quip_speak(quip, message_type, payload=None):
                 "Hear ye, hear ye! Chaos, frogs in suits, and a story incoming.",
                 "🌀 The Plaid Oddities Codex™ opens: *A giraffe in plaid checks your passport.*",
                 "📜 The PlaidRules Compendium™ reminds us: If the frog wears plaid, you must too.",
-                "🎭 Tonight’s performance: reality, but with worse stitching and more plaid."
+                "🎭 Tonight’s performance: reality, but with worse stitching and more plaid.",
+                "A penguin in plaid adjusts its monocle before the tale begins.",
+                "The chandelier giggles at dawn… that means story o’clock.",
+                "The Quips know when you giggle—best start giggling now.",
+                "Silence is also a word. You just didn’t choose it. Yet.",
+                "A raccoon in plaid offers cryptic directions to our plot."
             ])
             return f"{flavor}\n\n{payload}"
     
@@ -503,7 +508,15 @@ def quip_speak(quip, message_type, payload=None):
                 "A walrus in plaid applauds your mistake.",
                 "All food references are secretly weapons.",
                 "The ceiling fan knows your secrets.",
-                "If you pick plaid twice, you unlock plaid thrice."
+                "If you pick plaid twice, you unlock plaid thrice.",
+                "Numbers are louder than letters. Use them sparingly.",
+                "A llama in plaid rejects your application.",
+                "Beware of nouns with teeth.",
+                "The frog is not a mascot. The frog is watching.",
+                "When you choose ‘nothing,’ you still chose something.",
+                "A fox in plaid counts down from infinity.",
+                "Add ‘purple’ and reality softens.",
+                "The funnier your choice, the sadder the twist."
             ])
             return f"{payload}\n\n_{flavor}_"
     
@@ -513,7 +526,11 @@ def quip_speak(quip, message_type, payload=None):
                 "🔮 The frog is watching. Do you still confirm?",
                 "The curtain rod laughs at odd hours… was that a yes?",
                 "All endings are plaid—your choice just picks the shade.",
-                "📜 Rule 32: If two choices tie, the third one wins. Care to commit?"
+                "📜 Rule 32: If two choices tie, the third one wins. Care to commit?",
+                "Confirm—or risk summoning the librarian.",
+                "Every list hides a trapdoor. You just stepped near one.",
+                "Capitals SHOUT louder than they should. Is this your SHOUT?",
+                "Your choices are remembered forever. By frogs."
             ])
             return f"{flavor}\n\n{payload}"
     
@@ -523,7 +540,11 @@ def quip_speak(quip, message_type, payload=None):
                 "🎬 The frog in plaid bows before the credits roll.",
                 "📖 The book closes itself, giggling in Morse code.",
                 "🌙 The moon sneezes politely, and the story exhales.",
-                "A bear in plaid insists on being the narrator. But too late—the curtain falls."
+                "A bear in plaid insists on being the narrator. But too late—the curtain falls.",
+                "The oven door sighs like an old actor at curtain call.",
+                "The traffic light refuses to turn green—our tale halts here.",
+                "The universe coughs discreetly in plaid. The end.",
+                "The rug yawns as the final word lands. Rest now."
             ])
             return flavor
     
@@ -532,9 +553,14 @@ def quip_speak(quip, message_type, payload=None):
                 "Remix menu (MacQuip edition):",
                 "🌀 Plaid Oddities whisper: reshuffle thy chaos!",
                 "📜 PlaidRules decree: The second absurd choice is never free.",
-                "🎲 Quips roll dice behind the curtain—what remix dost thou seek?"
+                "🎲 Quips roll dice behind the curtain—what remix dost thou seek?",
+                "The sandwich mutters about destiny—choose your remix.",
+                "Pick ‘yes’ too often and the story learns consent. Remix wisely.",
+                "Rule #45 does not exist. Stop looking. Remix instead.",
+                "Plaid multiplies when stared at directly. Remix and see."
             ])
             return f"{flavor}\n\n{payload}\n\nAh! Let us embroider chaos."
+
 
 
     # ========== DJ Q'Wip ==========
@@ -920,10 +946,10 @@ def plaidmag_gen(story_text: str, format_name: str = "3-Panel Comic Scene"):
 
     # Build the base image prompt depending on format
     format_prompts = {
-        "3-Panel Comic Scene": f"Comic-style 3 panel illustration (setup, chaos, reveal) inspired by this story: {safe_prompt}",
-        "Character Portrait": f"Detailed character portrait illustration inspired by this story: {safe_prompt}",
-        "Plaid Card": f"Collectible trading card style illustration with plaid accents, inspired by this story: {safe_prompt}",
-        "Scene Illustration": f"Single dramatic moment illustration inspired by this story: {safe_prompt}",
+        "3-Panel Comic Scene": f"Comic-style 3 panel illustration (setup, chaos, reveal) inspired by this story with bright white background: {safe_prompt}",
+        "Character Portrait": f"Detailed character portrait illustration inspired by this story with bright white background: {safe_prompt}",
+        "Plaid Card": f"Collectible trading card style illustration with plaid accents, inspired by this story with bright white background: {safe_prompt}",
+        "Scene Illustration": f"Single dramatic moment illustration inspired by this story with bright white background: {safe_prompt}",
     }
     
     base_prompt = format_prompts.get(
@@ -1473,50 +1499,51 @@ if mode == "Lib-Ate":
         S = st.session_state["GLOBAL"]
     
         MASTER_PROMPTS = [
-            ("Character Name", "Noun", "A sidekick who smells faintly of pickles"),
-            ("Whimsical Being", "Noun", "A magical creature who causes mild inconvenience"),
-            ("Villain", "Noun", "Someone whose evil plan involves soup spoons"),
-            ("Hero", "Noun", "A brave soul terrified of butterflies"),
-            ("Animal", "Noun", "Any critter with questionable fashion sense"),
-            ("Mythic Figure", "Noun", "A forgotten god of slightly damp laundry"),
-            ("Object", "Noun", "Something you'd keep under your hat if you were sneaky"),
-            ("Mystical Object", "Noun", "An enchanted toothbrush of destiny"),
-            ("Food", "Noun", "Something you'd eat at a picnic on a floating island"),
-            ("Treasure", "Noun", "A shiny object worth less than you think"),
-            ("Tool", "Noun", "A device that works only when nobody’s watching"),
-            ("Weapon", "Noun", "A sword made of stale baguettes"),
-            ("Gadget", "Noun", "A machine with too many buttons and no purpose"),
-            ("Verb", "Verb", "An action you might regret during a tea party"),
-            ("Odd Verb", "Verb", "Something you’d do when no one is looking"),
-            ("Silly Motion", "Verb", "A dance move that frightens pigeons"),
-            ("Heroic Act", "Verb", "Something shouted dramatically but done clumsily"),
-            ("Villainous Act", "Verb", "An act of evil involving balloons"),
-            ("Adjective", "Adjective", "How a haunted marionette might feel on Mondays"),
-            ("Mood", "Adjective", "The vibe of a talking lamp at midnight"),
-            ("Texture", "Adjective", "The way stale marshmallows feel in your hands"),
-            ("Color", "Adjective", "The shade of regret in a melted popsicle"),
-            ("Size", "Adjective", "The scale of ambition for a goldfish"),
-            ("Silly Sound", "Interjection", "A noise that confuses ducks but impresses robots"),
-            ("Exclamation", "Interjection", "Something you’d shout after inventing a reversible hammock"),
-            ("Battle Cry", "Interjection", "A shout that’s more sneeze than roar"),
-            ("Lullaby Word", "Interjection", "A soothing nonsense word"),
-            ("Laugh", "Interjection", "A cackle stolen from a gremlin"),
-            ("Place", "Noun (Place)", "A location where secrets are traded for cheese"),
-            ("Magical Place", "Noun (Place)", "A forest that whispers about socks"),
-            ("Workplace", "Noun (Place)", "An office run entirely by parrots"),
-            ("Dangerous Place", "Noun (Place)", "A canyon filled with giant rubber ducks"),
-            ("Safe Haven", "Noun (Place)", "A pillow fort with questionable Wi-Fi"),
-            ("Emotion", "Noun", "What raccoons feel when the trash can is locked"),
-            ("Secret Emotion", "Noun", "How you feel when ice cream falls"),
-            ("Villain Mood", "Noun", "The satisfaction of tying shoelaces too tight"),
-            ("Hero Mood", "Noun", "The joy of finally opening a pickle jar"),
-            ("Odd Feeling", "Noun", "A sensation like déjà vu but stickier"),
-            ("Weather", "Noun", "Rain that falls sideways out of spite"),
-            ("Time", "Noun", "A moment when clocks all sneeze at once"),
-            ("Transport", "Noun", "A vehicle powered by polite arguments"),
-            ("Magic Spell", "Verb/Noun", "A chant that only works on Tuesdays"),
-            ("Curse", "Phrase", "An insult involving soup and destiny"),
+            ("Character Name", "Noun", "Try Rowan, Maximus the Bold"),
+            ("Whimsical Being", "Noun", "Try fairy, moon sprite"),
+            ("Villain", "Noun", "Try Varek, Lady Morgana"),
+            ("Hero", "Noun", "Try Arin, Selene of the Dawn"),
+            ("Animal", "Noun", "Try wolf, raven"),
+            ("Mythic Figure", "Noun", "Try Athena, Loki"),
+            ("Object", "Noun", "Try lantern, compass"),
+            ("Mystical Object", "Noun", "Try starstone, enchanted flute"),
+            ("Food", "Noun", "Try honey bread, spiced apples"),
+            ("Treasure", "Noun", "Try golden crown, ruby heart"),
+            ("Tool", "Noun", "Try hammer, blacksmith’s tongs"),
+            ("Weapon", "Noun", "Try silver sword, storm-forged staff"),
+            ("Gadget", "Noun", "Try telescope, clockwork orb"),
+            ("Verb", "Verb", "Try run, climb"),
+            ("Odd Verb", "Verb", "Try twirl, shimmer"),
+            ("Silly Motion", "Verb", "Try hop, wiggle-step"),
+            ("Heroic Act", "Verb", "Try rescue, defend"),
+            ("Villainous Act", "Verb", "Try scheme, betray"),
+            ("Adjective", "Adjective", "Try brave, glowing"),
+            ("Mood", "Adjective", "Try cheerful, tense"),
+            ("Texture", "Adjective", "Try smooth, rough"),
+            ("Color", "Adjective", "Try crimson, silver"),
+            ("Size", "Adjective", "Try tiny, colossal"),
+            ("Silly Sound", "Interjection", "Try boing, zap"),
+            ("Exclamation", "Interjection", "Try aha!, whoa!"),
+            ("Battle Cry", "Interjection", "Try charge!, onward!"),
+            ("Lullaby Word", "Interjection", "Try hush, laa"),
+            ("Laugh", "Interjection", "Try haha, hoho"),
+            ("Place", "Noun (Place)", "Try mountain village, shadowed cave"),
+            ("Magical Place", "Noun (Place)", "Try crystal lake, enchanted grove"),
+            ("Workplace", "Noun (Place)", "Try forge, royal library"),
+            ("Dangerous Place", "Noun (Place)", "Try cursed dungeon, fiery volcano"),
+            ("Safe Haven", "Noun (Place)", "Try cottage, moonlit temple"),
+            ("Emotion", "Noun", "Try joy, sorrow"),
+            ("Secret Emotion", "Noun", "Try envy, regret"),
+            ("Villain Mood", "Noun", "Try spite, ambition"),
+            ("Hero Mood", "Noun", "Try hope, determination"),
+            ("Odd Feeling", "Noun", "Try déjà vu, distant shiver"),
+            ("Weather", "Noun", "Try storm, fog"),
+            ("Time", "Noun", "Try dawn, midnight"),
+            ("Transport", "Noun", "Try sailing ship, moon carriage"),
+            ("Magic Spell", "Verb/Noun", "Try ignite, shield"),
+            ("Curse", "Phrase", "Try 'sleep forever', 'your blade shall rust'"),
         ]
+
     
         # use the count chosen in Step 3 (self-heal if missing)
         needed_count = L.get("PROMPTS_NEEDED")
@@ -1720,7 +1747,7 @@ if mode == "Lib-Ate":
             st.error("⚠️ No story was generated. Please restart.")
             st.stop()
     
-        # --- If we are in PlaidMagGen mode ---
+        # --- PlaidMagGen visuals ---
         if st.session_state.get("plaidmag_mode", False):
             st.markdown("### 🎨 PlaidMagGen Visuals")
     
@@ -1769,7 +1796,87 @@ if mode == "Lib-Ate":
                         st.session_state.plaidmag_format = selected_format
                         st.rerun()
     
-            # Step 2: Generate once format is chosen
+            # Step 2: Ask style (limit to 5 at a time)
+            elif "plaidmag_style" not in st.session_state:
+                # Master list of all styles
+                all_styles = [
+                    "Whimsical / Storybook",
+                    "Surrealist / Absurdist",
+                    "Fantasy Realism",
+                    "Sci-Fi / Cyberpunk",
+                    "Gothic / Horror",
+                    "Vintage / 1920s Cartoon",
+                    "Theatrical Collage / Paper Cutout",
+                    "Classic Painting / Renaissance Vibe",
+                    "Minimalist Icon Set / Sticker Style",
+                    "Plaid Noir",
+                    "Plaid Noir Pop",
+                    "Plaid Film",
+                    "Plaid Sketch",
+                    "Plaid Glitch",
+                    "Plaid Patchwork",
+                    "Plaid Crayon Chaos",
+                    "Plaid Mosaic Vibe™",
+                    "Plaid Comic™",
+                    "Plaid Craft Kawaii™",
+                    "Plaid Schematic",
+                ]
+    
+                # Initialize or reshuffle 5 options
+                if "plaidmag_style_options" not in st.session_state:
+                    st.session_state.plaidmag_style_options = random.sample(all_styles, 5)
+    
+                style_options = st.session_state.plaidmag_style_options
+    
+                # Build menu
+                lines = []
+                for idx, n in enumerate(style_options, start=1):
+                    lines.append(f"{idx}. {n}")
+                wild_idx = len(style_options) + 1
+                reshuf_idx = wild_idx + 1
+                lines.append(f"{wild_idx}. Wild Card - Surprise style!")
+                lines.append(f"{reshuf_idx}. Reshuffle - Different options")
+    
+                style_menu = "\n".join(lines)
+                st.info(f"Choose your visual style:\n{style_menu}")
+    
+                style_choice = st.text_input(
+                    f"Your choice (1–{reshuf_idx} or style name)",
+                    key="plaidmag_style_input"
+                )
+    
+                if st.button("Confirm Style"):
+                    sel = style_choice.strip()
+    
+                    if sel.isdigit():
+                        num = int(sel)
+                        if 1 <= num <= len(style_options):
+                            selected_style = style_options[num - 1]
+                        elif num == wild_idx:
+                            selected_style = random.choice(all_styles)
+                            st.success(f"🎲 Wild Card → {selected_style}")
+                        elif num == reshuf_idx:
+                            st.session_state.plaidmag_style_options = random.sample(all_styles, 5)
+                            st.warning("🔄 Reshuffled! Pick again.")
+                            st.rerun()
+                        else:
+                            selected_style = None
+                    else:
+                        # Partial text match
+                        selected_style = next(
+                            (n for n in style_options if sel.lower() in n.lower()),
+                            None
+                        )
+    
+                    if not selected_style:
+                        st.error("❌ Invalid choice. Enter a number or style name.")
+                    else:
+                        st.session_state.plaidmag_style = selected_style
+                        st.success(f"✅ Style selected → {selected_style}")
+                        st.rerun()
+
+
+    
             # Step 2: Generate once format is chosen
             else:
                 selected_format = st.session_state.plaidmag_format
@@ -1816,31 +1923,36 @@ if mode == "Lib-Ate":
             st.code(
                 "🔄 What would you like to do next?\n\n"
                 "1. Fluff It Up - Add softness, poetic language, whimsy\n"
-                "2. Dial It Up - Switch to humorous dialect\n"
+                "2. Dial It Up - Switch to humorous dialect (Pirate, Southern, Gangsta)\n"
                 "3. Style It Up - Retell in a different literary style\n"
                 "4. Plaidgerize - Rewrite with maximum absurdity\n"
                 "5. PlaidMagGen-It - Generate matching PlaidLibs visual\n"
                 "6. New Story - Start over\n",
                 language="text",
             )
-    
+        
             choice = st.text_input("Pick 1–6", key="libate_remix")
             if st.button("Apply Remix"):
                 seeds = L.get("COLLECTED", {}).copy()
                 style = L.get("STYLE_SELECTED", "Flash Fiction")
                 genre = L.get("GENRE_SELECTED", "Adventure")
                 absurd = L.get("ABSURDITY_SELECTED", "Mild")
-    
+        
+                remix_instruction = None
+        
                 if choice.strip() == "1":
                     style = "Magic Realism"
+                    remix_instruction = "Make the retelling softer, whimsical, poetic."
                 elif choice.strip() == "2":
-                    seeds["trait"] = seeds.get("trait", "grit") + " (dialect spice)"
+                    remix_instruction = "Rewrite the story in a humorous dialect (Pirate, Southern, or Gangsta)."
                 elif choice.strip() == "3":
                     style = random.choice(
                         ["Ballads", "Breaking News", "Scriptlets", "Flash Fiction"]
                     )
+                    remix_instruction = f"Retell the story in the style of {style}."
                 elif choice.strip() == "4":
                     absurd = "Plaidemonium™"
+                    remix_instruction = "Keep the same plot but maximize absurdity."
                 elif choice.strip() == "5":
                     # ✅ Enter PlaidMagGen mode
                     st.session_state.plaidmag_mode = True
@@ -1848,14 +1960,19 @@ if mode == "Lib-Ate":
                 elif choice.strip() == "6":
                     reset_mode("Lib-Ate")
                     st.rerun()
-    
+        
                 if choice.strip() in {"1", "2", "3", "4"}:
+                    if remix_instruction:
+                        seeds["remix_note"] = remix_instruction  # inject into seeds
+        
                     new_story = generate_story(
                         style, genre, absurd, L.get("QUIP_SELECTED", "MacQuip"), seeds
                     )
                     st.session_state.generated_story = new_story
                     st.markdown("### ✨ Remixed Story")
                     st.markdown(new_story)
+
+
 
 
  
@@ -2260,45 +2377,171 @@ elif mode == "Create Direct":
             language="text",
         )
     
-        choice = st.text_input("Pick 1-5", key="cd_remix")
+        choice = st.text_input("Pick 1-6 (number or text)", key="cd_remix")
         if st.button("Apply Remix"):
             seeds = C.get("COLLECTED", {}).copy()
             style = C.get("STYLE_SELECTED", "Flash Fiction")
             genre = C.get("GENRE_SELECTED", "Adventure")
             absurd = C.get("ABSURDITY_SELECTED", "Mild")
     
-            # 🔑 Force uniqueness each remix
             seeds["remix_id"] = str(random.randint(1000, 9999))
     
-            if choice.strip() == "1":
+            sel = choice.strip().lower()
+    
+            # ✅ Fluff It Up
+            if sel == "1" or "fluff" in sel:
                 style = "Magic Realism"
-            elif choice.strip() == "2":
+    
+            # ✅ Dial It Up
+            elif sel == "2" or "dial" in sel:
                 seeds["trait"] = seeds.get("trait", "grit") + " (dialect spice)"
-            elif choice.strip() == "3":
+    
+            # ✅ Style It Up
+            elif sel == "3" or "style" in sel:
                 style = random.choice(["Ballads", "Breaking News", "Scriptlets", "Flash Fiction"])
-            elif choice.strip() == "4":
+    
+                    # ✅ Plaidgerize
+            elif sel == "4" or sel in {"plaid", "plaidge", "plaidgerize"}:
                 absurd = "Plaidemonium™"
-            elif choice.strip() == "5":
-                with st.spinner("🎨 Generating PlaidMagGen visuals..."):# PlaidMagGen-It
+    
+            # ✅ PlaidMagGen
+            elif sel == "5" or "plaidmag" in sel or "maggen" in sel:
+                st.session_state.plaidmag_mode = True
+                st.rerun()
+
+    
+            # ✅ New Story
+            elif sel == "6" or "new" in sel or "restart" in sel:
+                reset_mode("Create Direct")
+                st.rerun()
+    
+                    # 🎭 Generate new story if remix option chosen (1–4 only)
+            if any(x in sel for x in ["1", "2", "3", "fluff", "dial", "style"]) or sel in {"4", "plaid", "plaidge", "plaidgerize"}:
+                new_story = generate_story(style, genre, absurd, active_quip, seeds)
+                st.session_state.generated_story = new_story
+                st.markdown("### ✨ Remixed Story")
+                st.markdown(new_story)
+
+
+
+        
+        # ✅ Handle PlaidMagGen separately (not tied to Apply Remix)
+        elif (
+            choice.strip() == "5"
+            or "plaidmag" in choice.strip().lower()
+            or "maggen" in choice.strip().lower()
+        ):  # PlaidMagGen-It
+
+            st.markdown("### 🎨 PlaidMagGen Visuals")
+        
+            # STEP 1: Format
+            if "plaidmag_format" not in st.session_state:
+                st.info(
+                    "Choose your format:\n"
+                    "1. 3-Panel Comic Scene\n"
+                    "2. Character Portrait\n"
+                    "3. Plaid Card\n"
+                    "4. Scene Illustration\n"
+                    "5. Wild Card"
+                )
+                fmt_choice = st.text_input("Enter format (1–5 or name)", key="pmg_format_in")
+                if st.button("✅ Confirm Format", key="pmg_confirm_format"):
+                    mapping = {
+                        "1": "3-Panel Comic Scene",
+                        "2": "Character Portrait",
+                        "3": "Plaid Card",
+                        "4": "Scene Illustration",
+                        "5": "Wild Card",
+                    }
+                    sel = fmt_choice.strip()
+                    selected_format = mapping.get(sel) or next(
+                        (v for v in mapping.values() if sel.lower() in v.lower()), None
+                    )
+                    if not selected_format:
+                        st.error("❌ Invalid format choice")
+                    else:
+                        if selected_format == "Wild Card":
+                            selected_format = random.choice(list(mapping.values())[:-1])
+                        st.session_state.plaidmag_format = selected_format
+                        st.rerun()
+        
+
+            # STEP 2: Style
+            elif "plaidmag_style" not in st.session_state:
+                # Full list of styles
+                all_styles = [
+                    "Whimsical / Storybook",
+                    "Surrealist / Absurdist",
+                    "Fantasy Realism",
+                    "Sci-Fi / Cyberpunk",
+                    "Gothic / Horror",
+                    "Vintage / 1920s Cartoon",
+                    "Theatrical Collage / Paper Cutout",
+                    "Classic Painting / Renaissance Vibe",
+                    "Minimalist Icon Set / Sticker Style",
+                    "Plaid Noir",
+                    "Plaid Noir Pop",
+                    "Plaid Film",
+                    "Plaid Sketch",
+                    "Plaid Glitch",
+                    "Plaid Patchwork",
+                    "Plaid Crayon Chaos",
+                    "Plaid Mosaic Vibe™",
+                    "Plaid Comic™",
+                    "Plaid Craft Kawaii™",
+                    "Plaid Schematic",
+                ]
+            
+                # Shuffle and persist if not already set
+                if "reshuffled_styles" not in st.session_state:
+                    st.session_state.reshuffled_styles = random.sample(all_styles, len(all_styles))
+            
+                # Pick first 5 from shuffled list
+                current_set = st.session_state.reshuffled_styles[:5]
+            
+                # Build menu inside info box
+                style_menu = "\n".join([f"{i}. {s}" for i, s in enumerate(current_set, 1)])
+                style_menu += "\n6. Wild Card\n7. Reshuffle"
+            
+                st.info(f"Choose your style:\n{style_menu}")
+            
+                style_choice = st.text_input("Enter style (1–7 or name)", key="pmg_style_in")
+            
+                if st.button("✅ Confirm Style", key="pmg_confirm_style"):
+                    mapping = {str(i): s for i, s in enumerate(current_set, 1)}
+                    sel = style_choice.strip()
+            
+                    if sel == "6" or sel.lower() == "wild card":
+                        selected_style = random.choice(all_styles)
+                        st.success(f"🎲 Wild Card → {selected_style}")
+                        st.session_state.plaidmag_style = selected_style
+                        st.rerun()
+            
+                    elif sel == "7" or sel.lower() == "reshuffle":
+                        st.session_state.reshuffled_styles = random.sample(all_styles, len(all_styles))
+                        st.rerun()
+            
+                    else:
+                        selected_style = mapping.get(sel) or next(
+                            (v for v in current_set if sel.lower() in v.lower()), None
+                        )
+                        if not selected_style:
+                            st.error("❌ Invalid style choice")
+                        else:
+                            st.session_state.plaidmag_style = selected_style
+                            st.rerun()
+
+
+        
+            # STEP 3: Generate
+            else:
+                fmt = st.session_state.plaidmag_format
+                sty = st.session_state.plaidmag_style
+                with st.spinner(f"🎨 Generating {fmt} in {sty}..."):
                     try:
-                        img = plaidmag_gen(story_text)  # returns one composite PNG
+                        img = plaidmag_gen(story_text, fmt)
                         if img:
-                            st.session_state.generated_image = img
-                            st.image(
-                                img,
-                                caption="🎨 PlaidMagGen Comic",
-                                use_container_width=True
-                            )
-                
-                            # Optional: Download button
-                            buf = BytesIO()
-                            img.save(buf, format="PNG")
-                            st.download_button(
-                                label="📥 Download Comic as PNG",
-                                data=buf.getvalue(),
-                                file_name="plaidmaggen_comic.png",
-                                mime="image/png",
-                            )
+                            st.image(img, caption=f"PlaidMagGen → {fmt} | {sty}", use_container_width=True)
                         else:
                             st.error("⚠️ Image generation failed — no image returned.")
                     except Exception as e:
@@ -2309,11 +2552,12 @@ elif mode == "Create Direct":
                 st.session_state.generated_story = new_story
                 st.markdown("### ✨ Remixed Story")
                 st.markdown(new_story)
-            elif choice.strip() == "6":
-                reset_mode("Create Direct")
-                st.rerun()
-            else:
-                st.error("Pick 1-5.")
+                
+        elif choice.strip() == "6":
+            reset_mode("Create Direct")
+            st.rerun()
+        else:
+            st.error("Pick 1-6")
 
         # Download button
         st.subheader("Post-Story Options")
@@ -2593,76 +2837,185 @@ elif mode == "Storyline":
         G["CURRENT_STEP"] = 5
         st.rerun()
 
+
     # ---------- Step 5: Remix / Post ----------
     elif step == 5:
-        v = user_msg.strip()
-        if v in {"1","2","3","4"}:
-            seeds = S["STORY_SEEDS"]
-            style, absurd = S["STYLE_SELECTED"], S["ABSURDITY_SELECTED"]
-            genre = random.choice([g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE])
-            if v == "1": style = "Magic Realism"
-            elif v == "2": seeds["trait"] += " (dialect spice)"
-            elif v == "3": style = random.choice(["Ballads","Flash Fiction","Scriptlets","Breaking News"])
-            elif v == "4": absurd = "Plaidemonium™"
-
-            remixed = generate_story(
-                style=style,
-                genre=genre,
-                absurdity=absurd,
-                narrator=active_quip,
-                seeds=seeds
-            )
-            st.session_state.generated_story = remixed
-            S["chat"].append(("assistant", f"✨ **Remixed story:**\n\n{remixed}"))
+        v = user_msg.strip().lower()
+    
+        # master list of styles (reuseable)
+        ALL_STYLES = [
+            "Whimsical / Storybook", "Surrealist / Absurdist", "Fantasy Realism",
+            "Sci-Fi / Cyberpunk", "Gothic / Horror", "Vintage / 1920s Cartoon",
+            "Theatrical Collage / Paper Cutout", "Classic Painting / Renaissance Vibe",
+            "Minimalist Icon Set / Sticker Style", "Plaid Noir", "Plaid Noir Pop",
+            "Plaid Film", "Plaid Sketch", "Plaid Glitch", "Plaid Patchwork",
+            "Plaid Crayon Chaos", "Plaid Mosaic Vibe™", "Plaid Comic™",
+            "Plaid Craft Kawaii™", "Plaid Schematic"
+        ]
+    
+        # --- If we're already inside a Plaid flow, handle that first ---
+        if st.session_state.get("plaid_step") == "format":
+            # Accept numbers or text names
+            format_map = {
+                "1": "3-Panel Comic Scene", "3-panel comic scene": "3-Panel Comic Scene", "comic": "3-Panel Comic Scene",
+                "2": "Character Portrait", "character portrait": "Character Portrait", "portrait": "Character Portrait",
+                "3": "Plaid Card", "plaid card": "Plaid Card", "card": "Plaid Card",
+                "4": "Scene Illustration", "scene illustration": "Scene Illustration", "scene": "Scene Illustration",
+                "5": "Wild Card", "wild card": "Wild Card", "wild": "Wild Card"
+            }
+    
+            if v in format_map:
+                st.session_state.plaid_format = format_map[v]
+                # pick 5 random styles (persist)
+                st.session_state.plaid_styles = random.sample(ALL_STYLES, 5)
+                st.session_state.plaid_step = "style"
+    
+                # show style menu
+                menu_text = "🎨 **Choose your style:**\n"
+                for i, s in enumerate(st.session_state.plaid_styles, 1):
+                    menu_text += f"{i}. {s}\n"
+                menu_text += "6. Wild Card\n7. Reshuffle"
+                say("assistant", menu_text)
+                st.rerun()
+            else:
+                say("assistant", "❌ Invalid format. Pick 1–5 or type the format name.")
+                st.rerun()
+    
+        elif st.session_state.get("plaid_step") == "style":
+            v = user_msg.strip().lower()
+            styles = st.session_state["plaid_styles"]
         
-        elif v == "5":
-            with st.spinner("🎨 Generating PlaidMagGen visuals..."):  # PlaidMagGen-It
-                try:
+            if v in {str(i+1) for i in range(len(styles))}:
+                chosen_style = styles[int(v) - 1]
+            elif v in {s.lower() for s in styles}:
+                chosen_style = next(s for s in styles if s.lower() == v)
+            elif v in {"5", "wild card"}:
+                chosen_style = random.choice(all_styles)
+            elif v in {"reshuffle"}:
+                random.shuffle(all_styles)
+                st.session_state["plaid_styles"] = all_styles[:5]
+                say("assistant",
+                    "🔄 Styles reshuffled!\n" +
+                    "\n".join([f"{i+1}. {s}" for i, s in enumerate(st.session_state["plaid_styles"], start=1)]) +
+                    "\n5. Wild Card\nType a number or style name."
+                )
+                st.rerun()
+            else:
+                say("assistant", "❌ Please pick 1–5, a style name, or 'reshuffle'.")
+                st.rerun()
+                
+        
+            # Save chosen style
+            st.session_state["plaid_style"] = chosen_style
+        
+            # ✅ Generate image
+            try:
+                with st.spinner("🎨 Generating PlaidMagGen visuals..."):
                     story_text = st.session_state.get("generated_story", "")
                     if not story_text:
                         st.error("⚠️ No story available for image generation.")
                     else:
-                        img = plaidmag_gen(story_text)
+                        # Pass both format + style into the prompt
+                        prompt_text = (
+                            f"{story_text}\n\n"
+                            f"---\n"
+                            f"Visual format: {st.session_state.plaid_format}\n"
+                            f"Visual style: {st.session_state.plaid_style}"
+                        )
+        
+                        img = plaidmag_gen(prompt_text, format_name=st.session_state.plaid_format)
+        
                         if img:
                             st.session_state.generated_image = img
                             st.image(
                                 img,
-                                caption="🎨 PlaidMagGen Comic",
+                                caption=f"🎨 {st.session_state.plaid_format} — {st.session_state.plaid_style}",
                                 use_container_width=True
                             )
-        
-                            # Optional: Download button
                             buf = BytesIO()
                             img.save(buf, format="PNG")
                             st.download_button(
-                                label="📥 Download Comic as PNG",
+                                label="📥 Download Image as PNG",
                                 data=buf.getvalue(),
-                                file_name="plaidmaggen_comic.png",
+                                file_name="plaidmaggen_image.png",
                                 mime="image/png",
                             )
                         else:
                             st.error("⚠️ Image generation failed — no image returned.")
-                except Exception as e:
-                    st.error(f"❌ PlaidMagGen failed: {e}")
-
-        elif v == "6":
-            reset_mode("Storyline")
+            except Exception as e:
+                st.error(f"❌ PlaidMagGen failed: {e}")
+        
+            # Cleanup
+            for k in ("plaid_step", "plaid_format", "plaid_styles", "plaid_style"):
+                st.session_state.pop(k, None)
+        
             st.rerun()
+
+    
+        # --- Otherwise, normal story-menu handling (start PlaidMagGen here) ---
         else:
-            say("assistant", "❌ Please pick **1–5**.")
-            st.rerun()
-
-            # Post-story buttons
-            st.subheader("Post-Story Options")
-            st.download_button(
-                label="📥 Download Story",
-                data=st.session_state.generated_story,
-                file_name="storyline_story.txt",
-                mime="text/plain",
-            )
-            if st.button("Restart Storyline"):
+            # story remix choices (1-4) / start PlaidMagGen (5) / reset (6)
+            if v in {"1", "fluff it up", "fluff", "magic realism"}:
+                seeds = S["STORY_SEEDS"]
+                style, absurd = S["STYLE_SELECTED"], S["ABSURDITY_SELECTED"]
+                genre = random.choice([g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE])
+                style = "Magic Realism"
+                remixed = generate_story(style=style, genre=genre, absurdity=absurd, narrator=active_quip, seeds=seeds)
+                st.session_state.generated_story = remixed
+                S["chat"].append(("assistant", f"✨ **Remixed story:**\n\n{remixed}"))
+    
+            elif v in {"2", "dial it up", "dialect", "spice"}:
+                seeds = S["STORY_SEEDS"]
+                style, absurd = S["STYLE_SELECTED"], S["ABSURDITY_SELECTED"]
+                genre = random.choice([g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE])
+                seeds["trait"] += " (dialect spice)"
+                remixed = generate_story(style=style, genre=genre, absurdity=absurd, narrator=active_quip, seeds=seeds)
+                st.session_state.generated_story = remixed
+                S["chat"].append(("assistant", f"✨ **Remixed story:**\n\n{remixed}"))
+    
+            elif v in {"3", "random style", "ballads", "flash fiction", "scriptlets", "breaking news"}:
+                seeds = S["STORY_SEEDS"]
+                style, absurd = S["STYLE_SELECTED"], S["ABSURDITY_SELECTED"]
+                genre = random.choice([g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE])
+                style = random.choice(["Ballads", "Flash Fiction", "Scriptlets", "Breaking News"])
+                remixed = generate_story(style=style, genre=genre, absurdity=absurd, narrator=active_quip, seeds=seeds)
+                st.session_state.generated_story = remixed
+                S["chat"].append(("assistant", f"✨ **Remixed story:**\n\n{remixed}"))
+    
+            elif v in {"4", "plaidemonium", "absurd"}:
+                seeds = S["STORY_SEEDS"]
+                style, absurd = S["STYLE_SELECTED"], S["ABSURDITY_SELECTED"]
+                genre = random.choice([g[0] for g in CORE_GENRES + FLEX_GENRES + PLAIDVERSE])
+                absurd = "Plaidemonium™"
+                remixed = generate_story(style=style, genre=genre, absurdity=absurd, narrator=active_quip, seeds=seeds)
+                st.session_state.generated_story = remixed
+                S["chat"].append(("assistant", f"✨ **Remixed story:**\n\n{remixed}"))
+    
+            elif v in {"5", "image", "comic", "plaidmaggen"}:
+                # start Plaid flow: ask format
+                st.session_state.plaid_step = "format"
+                say("assistant",
+                    "🎨 **Choose your format:**\n"
+                    "1. 3-Panel Comic Scene\n"
+                    "2. Character Portrait\n"
+                    "3. Plaid Card\n"
+                    "4. Scene Illustration\n"
+                    "5. Wild Card\n\n"
+                    "Type the number or the format name."
+                )
+                st.rerun()
+    
+            elif v in {"6", "restart", "reset"}:
                 reset_mode("Storyline")
                 st.rerun()
+    
+            else:
+                say("assistant", "❌ Please pick **1–6** (number or keyword).")
+                st.rerun()
+    
+            # (optional) Post-story UI code could remain here if you want it shown after remix
+
+
 
         
     
@@ -3816,6 +4169,37 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
