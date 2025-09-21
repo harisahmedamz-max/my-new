@@ -238,6 +238,33 @@ def init_state():
                 {"role": "assistant", "content": quip_greeting("MacQuip") if 'quip_greeting' in globals() else "Hello!"}
             ]
         }
+def show_post_story_buttons():
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔄 Restart Storyline"):
+            reset_mode("Storyline")
+            st.rerun()
+    with col2:
+        if st.button("🎨 PlaidMagGen (Image)"):
+            st.session_state.plaid_step = "format"
+            say("assistant",
+                "🎨 **Choose your format:**\n"
+                "1. 3-Panel Comic Scene\n"
+                "2. Character Portrait\n"
+                "3. Plaid Card\n"
+                "4. Scene Illustration\n"
+                "5. Wild Card\n\n"
+                "Type the number or the format name."
+            )
+            st.rerun()
+
+
+def back_to_post_story():
+    if st.button("⬅ Back to Post-Story"):
+        # Clean PlaidMagGen session keys
+        for k in ("plaid_step", "plaid_format", "plaid_styles", "plaid_style"):
+            st.session_state.pop(k, None)
+        st.rerun()
 
 def reset_libate_full(preserve_quip=True):
     """
@@ -2906,6 +2933,8 @@ elif mode == "Storyline":
                             st.error("⚠️ Image generation failed — no image returned.")
                 except Exception as e:
                     st.error(f"❌ PlaidMagGen failed: {e}")
+
+            back_to_post_story()
         
             # Cleanup
             #for k in ("plaid_step", "plaid_format", "plaid_styles", "plaid_style"):
@@ -2973,6 +3002,7 @@ elif mode == "Storyline":
     
             else:
                 say("assistant", "❌ Please pick **1–6** (number or keyword).")
+                show_post_story_buttons()
                 st.rerun()
     
             # (optional) Post-story UI code could remain here if you want it shown after remix
@@ -4131,6 +4161,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
