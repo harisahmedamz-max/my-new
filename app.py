@@ -2872,18 +2872,19 @@ elif mode == "Storyline":
                 say("assistant", "❌ Please pick 1–5, a style name, or 'reshuffle'.")
                 st.rerun()
                 
-        
-            # Save chosen style
-            st.session_state["plaid_style"] = chosen_style
-        
+            # Save chosen style (tuple unpacked)
+            style_name, style_desc = chosen_style
+            st.session_state["plaid_style"] = style_name
+            
             # ✅ Generate image
-            with st.spinner("🎨 Generating PlaidMagGen visuals..."):  # PlaidMagGen-It
+            with st.spinner(f"🎨 Generating PlaidMagGen visuals in style: {style_name}..."):
                 try:
                     story = st.session_state.get("generated_story", "")
                     if not story:
                         st.error("⚠️ No story available for image generation.")
                     else:
-                        img = plaidmag_gen(story,chosen_style)
+                        img = plaidmag_gen(story, f"{style_name}: {style_desc}")
+
                         if img:
                             st.session_state.generated_image = img
                             st.image(
@@ -4130,6 +4131,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
