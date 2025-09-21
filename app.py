@@ -239,170 +239,89 @@ def init_state():
             ]
         }
 
+def reset_libate_full(preserve_quip=True):
+    """
+    Hard reset for Lib-Ate workflow:
+     - clears LIBATE and GLOBAL state used by the flow
+     - clears generated_story / generated_image and plaidmag state
+     - re-initializes LIBATE and GLOBAL to defaults
+     - clears chat
+    If preserve_quip=True, keep previously selected quip (if any).
+    """
+    # Preserve quip if present and wanted
+    prev_quip = None
+    if preserve_quip:
+        prev_quip = st.session_state.get("LIBATE", {}).get("QUIP_SELECTED", None)
+
+    # Keys we want to remove (top-level keys created by the flow)
+    keys_to_remove = [
+        "LIBATE", "GLOBAL", "chat",
+        "generated_story", "generated_image",
+        "plaidmag_mode", "plaidmag_format", "plaidmag_style",
+        "plaidmag_style_options", "plaid_styles", "plaid_step",
+        "awaiting_restart_confirm", "PROMPTS_SESSION"  # included just in case
+    ]
+
+    for k in keys_to_remove:
+        st.session_state.pop(k, None)
+
+    # Recreate defaults exactly as your app expects
+    st.session_state["LIBATE"] = {"COLLECTED": {}, "QUIP_SELECTED": (prev_quip or "MacQuip"), "intro_shown": False}
+    st.session_state["GLOBAL"] = {"CURRENT_STEP": 1}
+    st.session_state["chat"] = []
+
+    # Force a fresh rerun
+    st.rerun()
+
 def reset_mode(mode: str):
     """
-    Robust reset helper: clears stale workflow keys, normalizes mode names,
-    and replaces the requested workflow state with a clean default dict.
-
-    NOTE: call st.experimental_rerun() (or st.rerun()) after calling this
-    from a button handler so Streamlit redraws the UI.
+    Fully reset the current workflow state and start fresh.
+    Preserves only sidebar widget keys (workflow_select, quip_select).
     """
 
-    # Normalize common mode name variants to canonical session keys
+    # Keys to preserve (Streamlit will re-populate them on rerun)
+    preserve_keys = {"workflow_select", "quip_select"}
+
+    # Normalize workflow names → canonical keys
     mode_map = {
-        # Lib-Ate variants
         "Lib-Ate": "LIBATE", "LibAte": "LIBATE", "LIB-ATE": "LIBATE",
-        # Create Direct variants
         "Create Direct": "CREATEDIRECT", "Create-Direct": "CREATEDIRECT",
         "CreateDirect": "CREATEDIRECT", "CREATEDIRECT": "CREATEDIRECT",
-        # Storyline
         "Storyline": "STORYLINE", "STORY-LINE": "STORYLINE",
-        # PlaidPic
         "PlaidPic": "PLAIDPIC", "Plaid-Pic": "PLAIDPIC",
-        # PlaidMagGen
         "PlaidMagGen": "PLAIDMAG", "PLAIDMAG": "PLAIDMAG",
-        # PlaidPlay
         "PlaidPlay": "PLAIDPLAY",
-        # PlaidChat
         "PlaidChat": "PLAIDCHAT",
     }
-
-    # Figure canonical workflow key
     canonical = mode_map.get(mode, None)
 
-    # Ensure GLOBAL exists, then set high-level mode pointers
-    if "GLOBAL" not in st.session_state:
-        st.session_state["GLOBAL"] = {}
+    # Clear all session_state except preserved keys
+    for k in list(st.session_state.keys()):
+        if k in preserve_keys:
+            continue
+        try:
+            del st.session_state[k]
+        except Exception:
+            pass
+
+    # Re-init baseline session keys
+    init_state()
+
+    # Set GLOBAL workflow pointers
     st.session_state["GLOBAL"].update({
         "CURRENT_MODE": mode,
         "CURRENT_STEP": 1,
         "WAITING_FOR": "",
     })
 
-    # Known workflow keys and common aliases to remove when resetting
-    known_workflow_keys = set(mode_map.values())
-    extra_aliases = {"chat", "chat_history", "messages", "emitted", "teaser", "VARS"}
-    all_known = known_workflow_keys.union(extra_aliases).union({"GLOBAL"})
+    # Ensure workflow-specific dict exists
+    if canonical and canonical not in st.session_state:
+        st.session_state[canonical] = {"QUIP_SELECTED": "MacQuip"}
 
-    # Remove stale workflow keys (except GLOBAL)
-    for k in list(st.session_state.keys()):
-        if k == "GLOBAL":
-            continue
-        # remove if it's one of the known workflow keys (case-insensitive)
-        if k in all_known or k.upper() in all_known:
-            del st.session_state[k]
-
-    # Helper to set a workflow state
-    def set_state(key, value):
-        st.session_state[key] = value
-
-    # --- per-mode defaults (comprehensive) ---
-    if canonical == "LIBATE":
-        set_state("LIBATE", {
-            "QUIP_SELECTED": "MacQuip",
-            "STYLE_SELECTED": None,
-            "GENRE_SELECTED": None,
-            "ABSURDITY_SELECTED": None,
-            "PROMPTS_NEEDED": 0,
-            "PROMPTS_COLLECTED": 0,
-            "COLLECTED": {},
-            "teaser": "",
-            "VARS": {},
-            "last_prompt_idx": None,
-            "intro_shown": False,
-            "chat_history": [],
-        })
-        # preserve legacy key if other parts use it
-        st.session_state["chat"] = []
-
-    elif canonical == "CREATEDIRECT":
-        # Clear both the dict and any raw keys that UI widgets might use
-        for k in ["USER_INPUT", "OUTPUT_STORY"]:
-            if k in st.session_state:
-                del st.session_state[k]
-    
-        set_state("CREATEDIRECT", {
-            "QUIP_SELECTED": "MacQuip",
-            "STYLE_SELECTED": None,
-            "GENRE_SELECTED": None,
-            "ABSURDITY_SELECTED": None,
-            "USER_INPUT": "",
-            "OUTPUT_STORY": "",
-            "PROMPTS_NEEDED": 0,
-            "PROMPTS_COLLECTED": 0,
-            "VARS": {},
-            "teaser": "",
-            "intro_shown": False,
-            "chat_history": [],
-        })
+    # Force rerun so UI restarts clean
+    st.rerun()
 
 
-    elif canonical == "STORYLINE":
-        set_state("STORYLINE", {
-            "USER_STORYLINE": "",
-            "QUIP_SELECTED": "MacQuip",
-            "STYLE_SELECTED": None,
-            "ABSURDITY_SELECTED": None,
-            "intro_shown": False,
-            "chat_history": [],
-        })
-
-    elif canonical == "PLAIDPIC":
-        set_state("PLAIDPIC", {
-            "IMAGE_UPLOADED": False,
-            "IMAGE_ANALYSIS": {},
-            "QUIP_SELECTED": "MacQuip",
-            "STYLE_SELECTED": None,
-            "GENRE_SELECTED": None,
-            "ABSURDITY_SELECTED": None,
-            "TEXT_DESC": "",
-            "chat": [],
-            "emitted": [],   # use list (safer for session_state serialization)
-        })
-
-    elif canonical == "PLAIDMAG":
-        set_state("PLAIDMAG", {
-            "FORMAT_SELECTED": None,
-            "STYLE_SELECTED": None,
-            "PROMPT_COLLECTED": "",
-            "ENHANCEMENT_TAGS": [],
-            "QUIP_SELECTED": "MacQuip",
-            "chat_history": [],
-            "STYLE_OPTIONS": None,
-        })
-
-    elif canonical == "PLAIDPLAY":
-        set_state("PLAIDPLAY", {
-            "QUIP_SELECTED": "MacQuip",
-            "STYLE_SELECTED": None,
-            "GENRE_SELECTED": None,
-            "ABSURDITY_SELECTED": None,
-            "PLAYER_EMAILS": [],
-            "SUBMISSIONS": [],
-            "VOTE_TALLY": {},
-            "SUBMISSIONS_RECEIVED": 0,
-            "MASTER_PROMPT": "",
-            "N_PLAYERS": 0,
-        })
-
-    elif canonical == "PLAIDCHAT":
-        set_state("PLAIDCHAT", {
-            "QUIP_SELECTED": "MacQuip",
-            "messages": [
-                {"role": "assistant", "content": quip_greeting("MacQuip")}
-            ]
-        })
-
-    else:
-        # Unknown mode: create a clean placeholder (prevents KeyError elsewhere)
-        if canonical is None:
-            # tolerate many synonyms — if unknown, still create a clear slot
-            st.session_state[mode] = {}
-
-    # Done. Caller should rerun the app to refresh UI:
-    # e.g. in your button handler:
-    #     reset_mode("Create Direct")
-    #     st.experimental_rerun()
 
 
 def macquip_aside(line: str, mode: Optional[str] = None) -> str:
@@ -435,6 +354,37 @@ def pick_random_styles(n=5):
     # Shuffle and pick n random styles
     random.shuffle(STYLES)
     return STYLES[:n]
+
+
+def pick_random_visual_styles(n=5):
+    # Full official visual style catalog (Appendix D)
+    VISUAL_STYLES = [
+        ("Whimsical / Storybook", "Soft outlines, warm pastels; Gentle textures, fairy tale tone; Ideal for heartwarming or nostalgic scenes"),
+        ("Surrealist / Absurdist", "Unnatural proportions, melting shapes; Dreamlike framing, optical illusions; Works well for ErrQuip or glitchy prompts"),
+        ("Fantasy Realism", "Painterly realism with fantastical lighting; Naturalistic anatomy + mythic touches; Great for epic quests, folklore, or ballads"),
+        ("Sci-Fi / Cyberpunk", "Neon glow, high-tech grit; Futuristic outfits, cityscapes, overlays; Pairs with genres like Interplaidactic or Thriller"),
+        ("Gothic / Horror", "Dark palettes, high contrast; Dramatic lighting, eerie shadows; Perfect for Plaid Gothic or emotional depth"),
+        ("Vintage / 1920s Cartoon", "Rubber-hose limbs, ink blots; Flat grayscale or faded color; Suited for satire or parody"),
+        ("Theatrical Collage / Paper Cutout", "Layered flat shapes, stage-like lighting; Surreal construction-paper aesthetic; Adds whimsy to courtroom chaos or satire"),
+        ("Classic Painting / Renaissance Vibe", "Oil texture simulation; Regal poses, chiaroscuro lighting; Great for historical drama, epic parody"),
+        ("Minimalist Icon Set / Sticker Style", "Clean vector-style graphics; Great for badges, stat icons, collectible symbols"),
+        ("Plaid Noir", "Monochrome with hard shadows; Retro detective drama atmosphere; Characters lit like stage sets; Red plaid accents required (ties, coats, signs, backgrounds); Mystery tone throughout"),
+        ("Plaid Noir Pop", "Adds bold color splashes for symbolic emotion; More graphic, more absurd, more stylized"),
+        ("Plaid Film", "Simulated filmstrip frame with sprocket holes; Retro cinematic vibe; used for triptychs"),
+        ("Plaid Sketch", "Pencil + ink style; Raw and expressive; Rough energy; good for works-in-progress"),
+        ("Plaid Glitch", "Digital artifacts, warped pixels; Often paired with ErrQuip or ChronoPlaid"),
+        ("Plaid Patchwork", "Textile collage look with visible seams; Uses cloth textures, quilting logic; Great for cozy horror or surreal stories"),
+        ("Plaid Crayon Chaos", "Childlike color bursts and waxy textures; Scribble energy with intentional messiness"),
+        ("Plaid Mosaic Vibe™", "Chunky tile-style abstraction; Symbolic image construction with sharp borders"),
+        ("Plaid Comic™", "Bold retro-pop linework; Halftone shadows, dramatic plaid costumes; Signature storytelling style for high-energy pieces"),
+        ("Plaid Craft Kawaii™", "Cube-headed voxel characters; Kawaii expressions, bright tones; Pixel-outlined comics on white backgrounds"),
+        ("Plaid Schematic", "Blueprint-style navy + white line drawings; Used for surreal diagrams, mechanical myths"),
+    ]
+
+    # Shuffle and pick n random styles
+    random.shuffle(VISUAL_STYLES)
+    return VISUAL_STYLES[:n]
+
 
 
 def genre_menu_block():
@@ -932,17 +882,25 @@ def tally_votes(submissions: List[Dict[str, Any]]) -> Dict[str, int]:
 
 def plaidmag_gen(story_text: str, format_name: str = "3-Panel Comic Scene"):
     """
-    Generate a PlaidMagGen image from the story with a chosen visual format.
-    
+    Generate a PlaidMagGen image from the story with a chosen visual format + visual style.
+
     Args:
         story_text (str): The story text to base the image on.
         format_name (str): Visual format style (e.g., "Character Portrait", "Plaid Card").
-    
+
     Returns:
         PIL.Image or None
     """
     # Trim story to avoid overly long prompts
     safe_prompt = story_text[:900]
+
+    # Get selected visual style (name + description)
+    style_info = st.session_state.get("plaidmag_style", None)
+    if style_info:
+        style_name, style_desc = style_info
+        style_prompt = f" Rendered in {style_name} style: {style_desc}."
+    else:
+        style_prompt = ""
 
     # Build the base image prompt depending on format
     format_prompts = {
@@ -951,16 +909,19 @@ def plaidmag_gen(story_text: str, format_name: str = "3-Panel Comic Scene"):
         "Plaid Card": f"Collectible trading card style illustration with plaid accents, inspired by this story with bright white background: {safe_prompt}",
         "Scene Illustration": f"Single dramatic moment illustration inspired by this story with bright white background: {safe_prompt}",
     }
-    
+
     base_prompt = format_prompts.get(
         format_name,
         f"Comic-style illustration with bright white background, inspired by this story: {safe_prompt}"
     )
 
+    # Append style enforcement
+    final_prompt = base_prompt + style_prompt
+
     try:
         result = client.images.generate(
             model="gpt-image-1",
-            prompt=base_prompt,
+            prompt=final_prompt,
             size="1024x1024"
         )
 
@@ -974,6 +935,7 @@ def plaidmag_gen(story_text: str, format_name: str = "3-Panel Comic Scene"):
     except Exception as e:
         st.error(f"❌ Image generation failed: {e}")
         return None
+
 
 def get_prompts_for_size(size):
     PROMPT_COUNTS = {
@@ -1573,35 +1535,36 @@ if mode == "Lib-Ate":
             L["VARS"] = {}
             L["last_prompt_idx"] = -1
             st.session_state["LIBATE"] = L
-    
+        
         idx = L.get("PROMPTS_COLLECTED", 0)
         session_prompts = L["PROMPTS_SESSION"]
-    
+        
         # done?
         if idx >= L["PROMPTS_NEEDED"]:
             S["CURRENT_STEP"] = 5
             st.session_state["GLOBAL"] = S
             st.rerun()
-    
+        
         key_name, title, helptext = session_prompts[idx]
-    
+        
         if L["last_prompt_idx"] != idx:
             msg = (
                 f"Prompt {idx+1} of {L['PROMPTS_NEEDED']}:\n\n"
-                f"**{title}**\n{helptext}\n\n"
-                f"{macquip_aside('If you draw a blank, type “surprise me”.', 'Lib-Ate')}\n\n"
-                "Your answer (or type \"surprise me\"):"
+                f"**{title}**\n{helptext}"
             )
             add_message(active_quip, quip_speak(active_quip, "prompt", msg))
             L["last_prompt_idx"] = idx
             st.session_state["LIBATE"] = L
             st.rerun()
-    
+        
+        # input box + hint
         v = st.text_input("Answer", key=f"libate_word_input_{idx}")
+        st.caption("Or type 'surprise me'")  # subtle hint, aligned left
+        
         if st.button("Submit answer", key=f"libate_submit_{idx}"):
             ans = (v or "").strip()
             add_message("user", ans if ans else "surprise me")
-    
+        
             if not ans or ans.lower() == "surprise me":
                 auto = ai_surprise(title, helptext)
                 L["COLLECTED"][key_name] = auto
@@ -1610,10 +1573,11 @@ if mode == "Lib-Ate":
             else:
                 L["COLLECTED"][key_name] = ans
                 L["VARS"][key_name] = ans
-    
+        
             L["PROMPTS_COLLECTED"] = idx + 1
             st.session_state["LIBATE"] = L
             st.rerun()
+
 
 
 
@@ -1798,65 +1762,47 @@ if mode == "Lib-Ate":
     
             # Step 2: Ask style (limit to 5 at a time)
             elif "plaidmag_style" not in st.session_state:
-                # Master list of all styles
-                all_styles = [
-                    "Whimsical / Storybook",
-                    "Surrealist / Absurdist",
-                    "Fantasy Realism",
-                    "Sci-Fi / Cyberpunk",
-                    "Gothic / Horror",
-                    "Vintage / 1920s Cartoon",
-                    "Theatrical Collage / Paper Cutout",
-                    "Classic Painting / Renaissance Vibe",
-                    "Minimalist Icon Set / Sticker Style",
-                    "Plaid Noir",
-                    "Plaid Noir Pop",
-                    "Plaid Film",
-                    "Plaid Sketch",
-                    "Plaid Glitch",
-                    "Plaid Patchwork",
-                    "Plaid Crayon Chaos",
-                    "Plaid Mosaic Vibe™",
-                    "Plaid Comic™",
-                    "Plaid Craft Kawaii™",
-                    "Plaid Schematic",
-                ]
-    
+                # Use the official picker (Appendix D enforced)
+                #from your_module import pick_random_visual_styles  # <-- adjust import path
+            
+                # Initialize all styles (unshuffled master catalog)
+                all_styles = pick_random_visual_styles(20)  # returns full catalog if n=20
+            
                 # Initialize or reshuffle 5 options
                 if "plaidmag_style_options" not in st.session_state:
-                    st.session_state.plaidmag_style_options = random.sample(all_styles, 5)
-    
+                    st.session_state.plaidmag_style_options = pick_random_visual_styles(5)
+            
                 style_options = st.session_state.plaidmag_style_options
-    
+            
                 # Build menu
                 lines = []
-                for idx, n in enumerate(style_options, start=1):
-                    lines.append(f"{idx}. {n}")
+                for idx, (name, desc) in enumerate(style_options, start=1):
+                    lines.append(f"{idx}. {name} — {desc}")
                 wild_idx = len(style_options) + 1
                 reshuf_idx = wild_idx + 1
                 lines.append(f"{wild_idx}. Wild Card - Surprise style!")
                 lines.append(f"{reshuf_idx}. Reshuffle - Different options")
-    
+            
                 style_menu = "\n".join(lines)
                 st.info(f"Choose your visual style:\n{style_menu}")
-    
+            
                 style_choice = st.text_input(
                     f"Your choice (1–{reshuf_idx} or style name)",
                     key="plaidmag_style_input"
                 )
-    
+            
                 if st.button("Confirm Style"):
                     sel = style_choice.strip()
-    
+            
                     if sel.isdigit():
                         num = int(sel)
                         if 1 <= num <= len(style_options):
                             selected_style = style_options[num - 1]
                         elif num == wild_idx:
                             selected_style = random.choice(all_styles)
-                            st.success(f"🎲 Wild Card → {selected_style}")
+                            st.success(f"🎲 Wild Card → {selected_style[0]}")
                         elif num == reshuf_idx:
-                            st.session_state.plaidmag_style_options = random.sample(all_styles, 5)
+                            st.session_state.plaidmag_style_options = pick_random_visual_styles(5)
                             st.warning("🔄 Reshuffled! Pick again.")
                             st.rerun()
                         else:
@@ -1864,19 +1810,17 @@ if mode == "Lib-Ate":
                     else:
                         # Partial text match
                         selected_style = next(
-                            (n for n in style_options if sel.lower() in n.lower()),
+                            (s for s in style_options if sel.lower() in s[0].lower()),
                             None
                         )
-    
+            
                     if not selected_style:
                         st.error("❌ Invalid choice. Enter a number or style name.")
                     else:
                         st.session_state.plaidmag_style = selected_style
-                        st.success(f"✅ Style selected → {selected_style}")
+                        st.success(f"✅ Style selected → {selected_style[0]}")
                         st.rerun()
 
-
-    
             # Step 2: Generate once format is chosen
             else:
                 selected_format = st.session_state.plaidmag_format
@@ -1896,26 +1840,55 @@ if mode == "Lib-Ate":
                 # ✅ Always display stored image if available
                 if "generated_image" in st.session_state:
                     img = st.session_state.generated_image
-                    st.image(
-                        img,
-                        caption=f"🎨 PlaidMagGen - {selected_format}",
-                        use_container_width=True
-                    )
+                
+                    if isinstance(img, list):
+                        st.image(
+                            img,
+                            caption=[f"🎨 PlaidMagGen - {selected_format} ({i+1})" for i in range(len(img))],
+                            use_container_width=True
+                        )
+                    else:
+                        st.image(
+                            img,
+                            caption=f"🎨 PlaidMagGen - {selected_format}",
+                            use_container_width=True
+                        )
+
                     # Download option
-                    buf = BytesIO()
-                    img.save(buf, format="PNG")
-                    st.download_button(
-                        label="📥 Download Image",
-                        data=buf.getvalue(),
-                        file_name=f"plaidmaggen_{selected_format.replace(' ', '_').lower()}.png",
-                        mime="image/png",
-                    )
+                    if isinstance(img, list):
+                        import zipfile
+                        zip_buf = BytesIO()
+                        with zipfile.ZipFile(zip_buf, "w") as zf:
+                            for i, im in enumerate(img, 1):
+                                buf = BytesIO()
+                                im.save(buf, format="PNG")
+                                zf.writestr(f"plaidmaggen_{selected_format.replace(' ', '_').lower()}_{i}.png", buf.getvalue())
+                        st.download_button(
+                            label="📥 Download Images (ZIP)",
+                            data=zip_buf.getvalue(),
+                            file_name=f"plaidmaggen_{selected_format.replace(' ', '_').lower()}.zip",
+                            mime="application/zip",
+                        )
+                    else:
+                        buf = BytesIO()
+                        img.save(buf, format="PNG")
+                        st.download_button(
+                            label="📥 Download Image",
+                            data=buf.getvalue(),
+                            file_name=f"plaidmaggen_{selected_format.replace(' ', '_').lower()}.png",
+                            mime="image/png",
+                        )
+
             
                 if st.button("⬅️ Back to Post-Story Menu"):
                     st.session_state.pop("plaidmag_mode", None)
                     st.session_state.pop("plaidmag_format", None)
-                    st.session_state.pop("generated_image", None)  # clear image too
+                    st.session_state.pop("plaidmag_style", None)           # <-- reset style
+                    st.session_state.pop("plaidmag_style_options", None)   # <-- reset options too
+                    st.session_state.pop("generated_image", None)
                     st.rerun()
+
+
 
     
         # --- Normal Post-story menu ---
@@ -1971,22 +1944,22 @@ if mode == "Lib-Ate":
                     st.session_state.generated_story = new_story
                     st.markdown("### ✨ Remixed Story")
                     st.markdown(new_story)
-
-
-
-
  
         # Post-story download options
         st.subheader("Post-Story Options")
         st.download_button(
             label="📥 Download Story",
-            data=st.session_state.generated_story,
-            file_name="libate_story.txt",
-            mime="text/plain",
+            data=story_text.encode("utf-8"),
+            file_name="story.html",   # or "story.txt" / "story.docx"
+            mime="text/html"          # or "text/plain" / "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
-        if st.button("Restart Lib-Ate"):
+
+        # Restart Lib-Ate workflow
+        if st.button("🔄 Restart Lib-Ate"):
             reset_mode("Lib-Ate")
             st.rerun()
+
+
 
 
 
@@ -2084,11 +2057,6 @@ elif mode == "Create Direct":
                     st.rerun()
 
 
-
-
-
-
-  
         # ----------------------------
     # STEP 2: Genre Selection
     # ----------------------------
@@ -2468,29 +2436,8 @@ elif mode == "Create Direct":
 
             # STEP 2: Style
             elif "plaidmag_style" not in st.session_state:
-                # Full list of styles
-                all_styles = [
-                    "Whimsical / Storybook",
-                    "Surrealist / Absurdist",
-                    "Fantasy Realism",
-                    "Sci-Fi / Cyberpunk",
-                    "Gothic / Horror",
-                    "Vintage / 1920s Cartoon",
-                    "Theatrical Collage / Paper Cutout",
-                    "Classic Painting / Renaissance Vibe",
-                    "Minimalist Icon Set / Sticker Style",
-                    "Plaid Noir",
-                    "Plaid Noir Pop",
-                    "Plaid Film",
-                    "Plaid Sketch",
-                    "Plaid Glitch",
-                    "Plaid Patchwork",
-                    "Plaid Crayon Chaos",
-                    "Plaid Mosaic Vibe™",
-                    "Plaid Comic™",
-                    "Plaid Craft Kawaii™",
-                    "Plaid Schematic",
-                ]
+                # Full list of styles (list of (name, desc) tuples)
+                all_styles = pick_random_visual_styles(20)
             
                 # Shuffle and persist if not already set
                 if "reshuffled_styles" not in st.session_state:
@@ -2499,8 +2446,8 @@ elif mode == "Create Direct":
                 # Pick first 5 from shuffled list
                 current_set = st.session_state.reshuffled_styles[:5]
             
-                # Build menu inside info box
-                style_menu = "\n".join([f"{i}. {s}" for i, s in enumerate(current_set, 1)])
+                # Build menu with style names only
+                style_menu = "\n".join([f"{i}. {s[0]}" for i, s in enumerate(current_set, 1)])
                 style_menu += "\n6. Wild Card\n7. Reshuffle"
             
                 st.info(f"Choose your style:\n{style_menu}")
@@ -2508,12 +2455,15 @@ elif mode == "Create Direct":
                 style_choice = st.text_input("Enter style (1–7 or name)", key="pmg_style_in")
             
                 if st.button("✅ Confirm Style", key="pmg_confirm_style"):
-                    mapping = {str(i): s for i, s in enumerate(current_set, 1)}
                     sel = style_choice.strip()
             
-                    if sel == "6" or sel.lower() == "wild card":
+                    # Numbered choices
+                    if sel.isdigit() and 1 <= int(sel) <= 5:
+                        selected_style = current_set[int(sel) - 1]
+            
+                    elif sel == "6" or sel.lower() == "wild card":
                         selected_style = random.choice(all_styles)
-                        st.success(f"🎲 Wild Card → {selected_style}")
+                        st.success(f"🎲 Wild Card → {selected_style[0]}")
                         st.session_state.plaidmag_style = selected_style
                         st.rerun()
             
@@ -2522,14 +2472,17 @@ elif mode == "Create Direct":
                         st.rerun()
             
                     else:
-                        selected_style = mapping.get(sel) or next(
-                            (v for v in current_set if sel.lower() in v.lower()), None
+                        # Partial text match against style name
+                        selected_style = next(
+                            (s for s in current_set if sel.lower() in s[0].lower()), None
                         )
                         if not selected_style:
                             st.error("❌ Invalid style choice")
                         else:
                             st.session_state.plaidmag_style = selected_style
+                            st.success(f"✅ Style selected → {selected_style[0]}")
                             st.rerun()
+
 
 
         
@@ -2844,13 +2797,26 @@ elif mode == "Storyline":
     
         # master list of styles (reuseable)
         ALL_STYLES = [
-            "Whimsical / Storybook", "Surrealist / Absurdist", "Fantasy Realism",
-            "Sci-Fi / Cyberpunk", "Gothic / Horror", "Vintage / 1920s Cartoon",
-            "Theatrical Collage / Paper Cutout", "Classic Painting / Renaissance Vibe",
-            "Minimalist Icon Set / Sticker Style", "Plaid Noir", "Plaid Noir Pop",
-            "Plaid Film", "Plaid Sketch", "Plaid Glitch", "Plaid Patchwork",
-            "Plaid Crayon Chaos", "Plaid Mosaic Vibe™", "Plaid Comic™",
-            "Plaid Craft Kawaii™", "Plaid Schematic"
+            ("Whimsical / Storybook", "Soft outlines, warm pastels; Gentle textures, fairy tale tone; Ideal for heartwarming or nostalgic scenes"),
+            ("Surrealist / Absurdist", "Unnatural proportions, melting shapes; Dreamlike framing, optical illusions; Works well for ErrQuip or glitchy prompts"),
+            ("Fantasy Realism", "Painterly realism with fantastical lighting; Naturalistic anatomy + mythic touches; Great for epic quests, folklore, or ballads"),
+            ("Sci-Fi / Cyberpunk", "Neon glow, high-tech grit; Futuristic outfits, cityscapes, overlays; Pairs with genres like Interplaidactic or Thriller"),
+            ("Gothic / Horror", "Dark palettes, high contrast; Dramatic lighting, eerie shadows; Perfect for Plaid Gothic or emotional depth"),
+            ("Vintage / 1920s Cartoon", "Rubber-hose limbs, ink blots; Flat grayscale or faded color; Suited for satire or parody"),
+            ("Theatrical Collage / Paper Cutout", "Layered flat shapes, stage-like lighting; Surreal construction-paper aesthetic; Adds whimsy to courtroom chaos or satire"),
+            ("Classic Painting / Renaissance Vibe", "Oil texture simulation; Regal poses, chiaroscuro lighting; Great for historical drama, epic parody"),
+            ("Minimalist Icon Set / Sticker Style", "Clean vector-style graphics; Great for badges, stat icons, collectible symbols"),
+            ("Plaid Noir", "Monochrome with hard shadows; Retro detective drama atmosphere; Characters lit like stage sets; Red plaid accents required (ties, coats, signs, backgrounds); Mystery tone throughout"),
+            ("Plaid Noir Pop", "Adds bold color splashes for symbolic emotion; More graphic, more absurd, more stylized"),
+            ("Plaid Film", "Simulated filmstrip frame with sprocket holes; Retro cinematic vibe; used for triptychs"),
+            ("Plaid Sketch", "Pencil + ink style; Raw and expressive; Rough energy; good for works-in-progress"),
+            ("Plaid Glitch", "Digital artifacts, warped pixels; Often paired with ErrQuip or ChronoPlaid"),
+            ("Plaid Patchwork", "Textile collage look with visible seams; Uses cloth textures, quilting logic; Great for cozy horror or surreal stories"),
+            ("Plaid Crayon Chaos", "Childlike color bursts and waxy textures; Scribble energy with intentional messiness"),
+            ("Plaid Mosaic Vibe™", "Chunky tile-style abstraction; Symbolic image construction with sharp borders"),
+            ("Plaid Comic™", "Bold retro-pop linework; Halftone shadows, dramatic plaid costumes; Signature storytelling style for high-energy pieces"),
+            ("Plaid Craft Kawaii™", "Cube-headed voxel characters; Kawaii expressions, bright tones; Pixel-outlined comics on white backgrounds"),
+            ("Plaid Schematic", "Blueprint-style navy + white line drawings; Used for surreal diagrams, mechanical myths"),
         ]
     
         # --- If we're already inside a Plaid flow, handle that first ---
@@ -2872,9 +2838,10 @@ elif mode == "Storyline":
     
                 # show style menu
                 menu_text = "🎨 **Choose your style:**\n"
-                for i, s in enumerate(st.session_state.plaid_styles, 1):
-                    menu_text += f"{i}. {s}\n"
+                for i, (name, desc) in enumerate(st.session_state.plaid_styles, 1):
+                    menu_text += f"{i}. **{name}** — *{desc}*\n"
                 menu_text += "6. Wild Card\n7. Reshuffle"
+
                 say("assistant", menu_text)
                 st.rerun()
             else:
@@ -2887,13 +2854,14 @@ elif mode == "Storyline":
         
             if v in {str(i+1) for i in range(len(styles))}:
                 chosen_style = styles[int(v) - 1]
-            elif v in {s.lower() for s in styles}:
-                chosen_style = next(s for s in styles if s.lower() == v)
+            elif v in {s[0].lower() for s in styles}:  # match name only
+                chosen_style = next(s for s in styles if s[0].lower() == v)
+
             elif v in {"5", "wild card"}:
-                chosen_style = random.choice(all_styles)
+                chosen_style = random.choice(ALL_STYLES)
             elif v in {"reshuffle"}:
-                random.shuffle(all_styles)
-                st.session_state["plaid_styles"] = all_styles[:5]
+                random.shuffle(ALL_STYLES)
+                st.session_state["plaid_styles"] = ALL_STYLES[:5]
                 say("assistant",
                     "🔄 Styles reshuffled!\n" +
                     "\n".join([f"{i+1}. {s}" for i, s in enumerate(st.session_state["plaid_styles"], start=1)]) +
@@ -2909,47 +2877,40 @@ elif mode == "Storyline":
             st.session_state["plaid_style"] = chosen_style
         
             # ✅ Generate image
-            try:
-                with st.spinner("🎨 Generating PlaidMagGen visuals..."):
-                    story_text = st.session_state.get("generated_story", "")
-                    if not story_text:
+            with st.spinner("🎨 Generating PlaidMagGen visuals..."):  # PlaidMagGen-It
+                try:
+                    story = st.session_state.get("generated_story", "")
+                    if not story:
                         st.error("⚠️ No story available for image generation.")
                     else:
-                        # Pass both format + style into the prompt
-                        prompt_text = (
-                            f"{story_text}\n\n"
-                            f"---\n"
-                            f"Visual format: {st.session_state.plaid_format}\n"
-                            f"Visual style: {st.session_state.plaid_style}"
-                        )
-        
-                        img = plaidmag_gen(prompt_text, format_name=st.session_state.plaid_format)
-        
+                        img = plaidmag_gen(story,chosen_style)
                         if img:
                             st.session_state.generated_image = img
                             st.image(
                                 img,
-                                caption=f"🎨 {st.session_state.plaid_format} — {st.session_state.plaid_style}",
+                                caption="🎨 PlaidMagGen Comic",
                                 use_container_width=True
                             )
+        
+                            # Optional: Download button
                             buf = BytesIO()
                             img.save(buf, format="PNG")
                             st.download_button(
-                                label="📥 Download Image as PNG",
+                                label="📥 Download Comic as PNG",
                                 data=buf.getvalue(),
-                                file_name="plaidmaggen_image.png",
+                                file_name="plaidmaggen_comic.png",
                                 mime="image/png",
                             )
                         else:
                             st.error("⚠️ Image generation failed — no image returned.")
-            except Exception as e:
-                st.error(f"❌ PlaidMagGen failed: {e}")
+                except Exception as e:
+                    st.error(f"❌ PlaidMagGen failed: {e}")
         
             # Cleanup
-            for k in ("plaid_step", "plaid_format", "plaid_styles", "plaid_style"):
-                st.session_state.pop(k, None)
+            #for k in ("plaid_step", "plaid_format", "plaid_styles", "plaid_style"):
+           #     st.session_state.pop(k, None)
         
-            st.rerun()
+         #   st.rerun()
 
     
         # --- Otherwise, normal story-menu handling (start PlaidMagGen here) ---
@@ -3514,7 +3475,7 @@ elif mode == "PlaidMagGen":
         
                 # Move to Step 2
                 st.session_state.step = 2
-                st.session_state.STYLE_OPTIONS = pick_random_styles(n=5)
+                st.session_state.STYLE_OPTIONS = pick_random_visual_styles(n=5)
                 styles = st.session_state.STYLE_OPTIONS
                 wild_idx = len(styles) + 1
                 reshuf_idx = len(styles) + 2
@@ -3532,7 +3493,7 @@ elif mode == "PlaidMagGen":
                 st.session_state.step = 2
                 assistant_message(f"🎲 Wild Card format → {fmt}")
         
-                st.session_state.STYLE_OPTIONS = pick_random_styles(n=5)
+                st.session_state.STYLE_OPTIONS = pick_random_visual_styles(n=5)
                 styles = st.session_state.STYLE_OPTIONS
                 wild_idx = len(styles) + 1
                 reshuf_idx = len(styles) + 2
@@ -3555,7 +3516,7 @@ elif mode == "PlaidMagGen":
                     st.session_state.step = 2
                     assistant_message(f"✅ Selected Format → {match}")
         
-                    st.session_state.STYLE_OPTIONS = pick_random_styles(n=5)
+                    st.session_state.STYLE_OPTIONS = pick_random_visual_styles(n=5)
                     styles = st.session_state.STYLE_OPTIONS
                     wild_idx = len(styles) + 1
                     reshuf_idx = len(styles) + 2
@@ -3573,7 +3534,7 @@ elif mode == "PlaidMagGen":
         elif st.session_state.step == 2:
             # Initialize random styles if not already set
             if "STYLE_OPTIONS" not in st.session_state:
-                st.session_state.STYLE_OPTIONS = pick_random_styles(n=5)
+                st.session_state.STYLE_OPTIONS = pick_random_visual_styles(n=5)
         
             styles = st.session_state.STYLE_OPTIONS
             wild_idx = len(styles) + 1
@@ -3602,14 +3563,14 @@ elif mode == "PlaidMagGen":
                     assistant_message(f"✅ Selected Style → {sel}")
                     assistant_message(step_prompts[3])
                 elif choice_num == wild_idx:
-                    sel = random.choice([s[0] for s in pick_random_styles(n=20)])
+                    sel = random.choice([s[0] for s in pick_random_visual_styles(n=20)])
                     st.session_state.answers["style"] = sel
                     st.session_state.step = 3
                     assistant_message(f"🎲 Wild Card style → {sel}")
                     assistant_message(step_prompts[3])
                 elif choice_num == reshuf_idx:
                     # Reshuffle → regenerate new 5
-                    st.session_state.STYLE_OPTIONS = pick_random_styles(n=5)
+                    st.session_state.STYLE_OPTIONS = pick_random_visual_styles(n=5)
                     new_styles = st.session_state.STYLE_OPTIONS
                     new_lines = [f"{i+1}. {n}" for i, (n, _) in enumerate(new_styles)]
                     new_lines.append(f"{len(new_styles)+1}. Wild Card")
@@ -3620,13 +3581,13 @@ elif mode == "PlaidMagGen":
         
             # Handle wild/reshuffle keywords
             elif "wild" in choice:
-                sel = random.choice([s[0] for s in pick_random_styles(n=20)])
+                sel = random.choice([s[0] for s in pick_random_visual_styles(n=20)])
                 st.session_state.answers["style"] = sel
                 st.session_state.step = 3
                 assistant_message(f"🎲 Wild Card style → {sel}")
                 assistant_message(step_prompts[3])
             elif "reshuffle" in choice:
-                st.session_state.STYLE_OPTIONS = pick_random_styles(n=5)
+                st.session_state.STYLE_OPTIONS = pick_random_visual_styles(n=5)
                 new_styles = st.session_state.STYLE_OPTIONS
                 new_lines = [f"{i+1}. {n}" for i, (n, _) in enumerate(new_styles)]
                 new_lines.append(f"{len(new_styles)+1}. Wild Card")
@@ -4169,6 +4130,41 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
