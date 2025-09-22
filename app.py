@@ -2674,8 +2674,6 @@ elif mode == "Storyline":
             if st.button("🔄 Restart Storyline"):
                 reset_mode("Storyline")
                 st.rerun()
-            if st.button("✨ Post Story"):
-                st.success("Story has been posted! (integration pending)")
         st.stop()
 
     # ---------- handle user input ----------
@@ -4164,6 +4162,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
