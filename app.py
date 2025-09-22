@@ -1852,7 +1852,6 @@ if mode == "Lib-Ate":
             else:
                 selected_format = st.session_state.plaidmag_format
                 st.success(f"✅ Format selected: {selected_format}")
-                st.success(f"✅ Style selected: {selected_style}")
             
                 if st.button("Generate Image", key="plaidmag_generate"):
                     with st.spinner(f"🎨 Generating {selected_format}..."):
@@ -4161,6 +4160,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
