@@ -2904,7 +2904,7 @@ elif mode == "Storyline":
             st.session_state["plaidmag_style"] = chosen_style
             
             # ✅ Generate image
-            with st.spinner(f"🎨 Generating PlaidMagGen visuals in style: {chosen_style}..."):
+            with st.spinner(f"🎨 Generating PlaidMagGen visual...."):
                 try:
                     story = st.session_state.get("generated_story", "")
                     if not story:
@@ -4161,6 +4161,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
