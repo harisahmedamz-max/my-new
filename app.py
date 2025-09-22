@@ -2934,8 +2934,7 @@ elif mode == "Storyline":
                 except Exception as e:
                     st.error(f"❌ PlaidMagGen failed: {e}")
 
-            back_to_post_story()
-            show_post_story_buttons()
+            
         
             # Cleanup
             #for k in ("plaid_step", "plaid_format", "plaid_styles", "plaid_style"):
@@ -3003,7 +3002,6 @@ elif mode == "Storyline":
     
             else:
                 say("assistant", "❌ Please pick **1–6** (number or keyword).")
-                show_post_story_buttons()
                 st.rerun()
     
             # (optional) Post-story UI code could remain here if you want it shown after remix
@@ -4162,6 +4160,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
