@@ -2902,7 +2902,7 @@ elif mode == "Storyline":
                 
             # Save chosen style (tuple unpacked)
             style_name, style_desc = chosen_style
-            st.session_state["plaid_style"] = style_name
+            st.session_state["plaidmag_style"] = style_name
             
             # ✅ Generate image
             with st.spinner(f"🎨 Generating PlaidMagGen visuals in style: {style_name}..."):
@@ -4162,6 +4162,7 @@ elif mode == "PlaidChat":
                 PC["messages"].append({"role": "assistant", "content": reply})
                 with st.chat_message("assistant"):
                     st.markdown(f"**{PC['QUIP_SELECTED']}:** {reply}")
+
 
 
 
