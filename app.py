@@ -50,9 +50,4 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Debug info (optional)
-if st.checkbox("🔍 Show debug info"):
-    assistant = client.beta.assistants.retrieve(ASSISTANT_ID)
-    st.write("Assistant:", assistant.name)
-    st.write("Instructions:", assistant.instructions)
-    st.write("Thread ID:", st.session_state.thread_id)
+
