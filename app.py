@@ -13,7 +13,7 @@ if "thread_id" not in st.session_state:
     st.session_state.thread_id = thread.id
     st.session_state.messages = []  # store conversation history
 
-st.title("💬 My Custom Assistant")
+st.title("💬 Plaid-Libs")
 
 # Chat input
 user_input = st.chat_input("Type your message here...")
@@ -48,4 +48,5 @@ if user_input:
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+
 
