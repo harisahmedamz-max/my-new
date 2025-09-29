@@ -5,7 +5,7 @@ from openai import OpenAI
 client = OpenAI()
 
 # Your assistant ID from Playground
-ASSISTANT_ID = "asst_PogREgRWsM0PH6LqvV114YR"
+ASSISTANT_ID = "asst_PogREgRWsM0PHH6LqvV114YR"
 
 # Initialize session state
 if "thread_id" not in st.session_state:
@@ -48,3 +48,4 @@ if user_input:
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+
