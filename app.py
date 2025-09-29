@@ -13,7 +13,7 @@ if "thread_id" not in st.session_state:
     thread = client.beta.threads.create()
     st.session_state.thread_id = thread.id
 
-st.title("PlaidLibs™ with MacQuip 🏴")
+st.title("Plaid-Libs™")
 
 # Chat history UI
 if "messages" not in st.session_state:
@@ -24,7 +24,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # User input
-if user_input := st.chat_input("Type to MacQuip..."):
+if user_input := st.chat_input("Type your message..."):
     # Save and show user message
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
@@ -70,6 +70,7 @@ if user_input := st.chat_input("Type to MacQuip..."):
         # Display assistant reply
         placeholder.markdown(reply)
         st.session_state.messages.append({"role": "assistant", "content": reply})
+
 
 
 
